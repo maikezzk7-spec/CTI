@@ -22,7 +22,7 @@
   </main>
 
   <footer class="bg-black text-white text-center p-4">
-    © 2026 Projeto Integrador 2/2026
+    © 2026 Projeto Integrador 2026
   </footer>
 </div>
 </template>
