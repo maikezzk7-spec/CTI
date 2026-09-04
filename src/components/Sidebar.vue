@@ -1,0 +1,17 @@
+<template>
+    <aside>
+        <nav>
+            <router-link to="/app/upload">
+                Upload
+            </router-link>
+
+            <router-link to="/app/relatorios">
+                Relatórios
+            </router-link>
+
+            <router-link to="/app/graficos">
+                Gráficos
+            </router-link>
+        </nav>
+    </aside>
+</template>
