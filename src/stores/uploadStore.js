@@ -6,7 +6,10 @@ export const useUploadStore = defineStore('upload', {
     arquivo: null,
     dadosOriginais: [],
     dadosTratados: [],
+    dadosValidados: [],
+    dadosInvalidados: [],
     erros: [],
+    statusValidacao: 'Aguardando o arquivo',
     carregando: false
   }),
 
@@ -20,13 +23,30 @@ export const useUploadStore = defineStore('upload', {
             cliente => cliente.nivel_cliente === 'A'
         ).length,
 
-    temDados: (state) => state.dadosTratados.length > 0
+    temDados: (state) => state.dadosTratados.length > 0,
+    totalValidados: (state) => state.dadosValidados.length,
+    totalInvalidados: (state) => state.dadosInvalidados.length,
+
+    percentualValido: (state) => {
+      if (state.dadosTratados.length === 0) {
+      return 0
+    }
+
+    return Math.round(
+      (state.dadosValidados.length / state.dadosTratados.length) * 100
+    )
+   }
   },
 
   actions: {
 
     selecionarArquivo(arquivo) {
       this.arquivo = arquivo
+      this.dadosOriginais = []
+      this.dadosTratados = []
+      this.dadosValidados = []
+      this.dadosInvalidados = []
+      this.statusValidacao = 'Arquivo selecionado'
       this.erros = []
     },
 
