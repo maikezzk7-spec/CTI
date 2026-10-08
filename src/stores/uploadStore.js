@@ -12,6 +12,7 @@ export const useUploadStore = defineStore('upload', {
     dadosValidados: [],
     dadosInvalidados: [],
     erros: [],
+    tiposErros:{},
     statusValidacao: 'Aguardando o arquivo',
     carregando: false
 
@@ -59,7 +60,7 @@ export const useUploadStore = defineStore('upload', {
       this.dadosInvalidados = []
       this.statusValidacao = 'Arquivo selecionado'
       this.erros = []
-
+      this.tiposErros = {}
     },
 
     validarArquivo() {
@@ -180,6 +181,8 @@ export const useUploadStore = defineStore('upload', {
 
       this.erros = []
 
+      this.tiposErros = {}
+
       const codigos = new Set()
 
       this.dadosTratados.forEach((linha, index) => {
@@ -238,6 +241,12 @@ export const useUploadStore = defineStore('upload', {
 
           errosLinha.forEach(erro => {
             this.erros.push(`Linha ${numeroLinha}: ${erro}`)
+
+            if (!this.tiposErros[erro]){
+              this.tiposErros[erro] = 0
+            }
+
+            this.tiposErros[erro]++
           })
 
         }
