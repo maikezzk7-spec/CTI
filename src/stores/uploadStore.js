@@ -35,6 +35,8 @@ export const useUploadStore = defineStore('upload', {
 
     totalInvalidados: (state) => state.dadosInvalidados.length,
 
+    nomeArquivo: (state) => state.arquivo?.name || 'Nenhum arquivo selecionado',
+
     percentualValido: (state) => {
 
       if (state.dadosTratados.length === 0) {
@@ -61,16 +63,19 @@ export const useUploadStore = defineStore('upload', {
       this.statusValidacao = 'Arquivo selecionado'
       this.erros = []
       this.tiposErros = {}
+      this.carregando = false
     },
 
     validarArquivo() {
+      this.erros = []
+      this.tiposErros = {}
 
       if (!this.arquivo) {
-
         this.erros = ['Selecione um arquivo.']
 
+        this.statusValidacao = 'Nenhum arquivo selecionado.'
+        
         return false
-
       }
 
       const extensoesPermitidas = ['.xlsx', '.xls', '.csv']
@@ -82,11 +87,11 @@ export const useUploadStore = defineStore('upload', {
       )
 
       if (!valido) {
-
         this.erros = ['Formato de arquivo não permitido.']
 
+        this.statusValidacao = 'Formato de arquivo inválido.'
+        
         return false
-
       }
 
       return true
@@ -101,17 +106,45 @@ export const useUploadStore = defineStore('upload', {
 
       this.erros = []
 
+      this.tiposErros = {}
+
+      this.dadosOriginais = []
+
+      this.dadosTratados = []
+
+      this.dadosValidados = []
+
+      this.dadosInvalidados = []
+
+      this.statusValidacao = 'Processando arquivo'
+
       try {
 
         const buffer = await this.arquivo.arrayBuffer()
 
         const workbook = XLSX.read(buffer)
 
+        if (workbook.SheetNames.length === 0){
+          this.erros = ['A planilha não possui abas para leitura.']
+
+          this.statusValidacao = 'Planilha sem abas para leitura.'
+
+          return
+        }
+
         const primeiraAba = workbook.SheetNames[0]
 
         const planilha = workbook.Sheets[primeiraAba]
 
         const linhas = XLSX.utils.sheet_to_json(planilha)
+
+        if (linhas.length === 0){
+          this.erros = ['A planilha não contém registros para validar.']
+
+          this.statusValidacao = 'Nenhum registro encontrado.'
+         
+          return
+        }
 
         this.dadosOriginais = linhas
 
@@ -122,6 +155,8 @@ export const useUploadStore = defineStore('upload', {
       } catch (error) {
 
         this.erros = ['Erro ao processar a planilha.']
+
+        this.statusValidacao = 'Falha ao processar o arquivo.'
 
         console.error(error)
 
@@ -161,6 +196,10 @@ export const useUploadStore = defineStore('upload', {
 
         ...linha,
 
+        codigo_cliente: String(linha.codigo_cliente || '').trim(),
+
+        nome_cliente: String(linha.nome_cliente || '').trim(),
+
         consultor: String(linha.consultor || '').trim(),
 
         segmento: mapaSegmentos[segmento] || segmento,
@@ -192,12 +231,12 @@ export const useUploadStore = defineStore('upload', {
         const numeroLinha = index + 2
 
         // Código obrigatório
-        if (!linha.codigo_cliente) {
+        if (!String(linha.codigo_cliente || '').trim()) {
           errosLinha.push('Código do cliente está vazio.')
         }
 
         // Nome obrigatório
-        if (!linha.nome_cliente) {
+        if (!String(linha.nome_cliente || '').trim()){
           errosLinha.push('Nome do cliente está vazio.')
         }
 
@@ -217,16 +256,16 @@ export const useUploadStore = defineStore('upload', {
         }
 
         // Verificar código duplicado
-        if (linha.codigo_cliente) {
+        const codigo = String(linha.codigo_cliente || '').trim()
 
-          if (codigos.has(linha.codigo_cliente)) {
+        if (codigo) {
+          if (codigos.has(codigo)){
             errosLinha.push('Código do cliente duplicado.')
           }
 
-          codigos.add(linha.codigo_cliente)
+          codigos.add(codigo)
 
         }
-
         // Separar válido e inválido
         if (errosLinha.length === 0) {
 
