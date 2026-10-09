@@ -1,33 +1,28 @@
-import { defineStore } from 'pinia'
+import { defineStore } from "pinia";
+import * as XLSX from "xlsx";
 
-import * as XLSX from 'xlsx'
-
-export const useUploadStore = defineStore('upload', {
-
+export const useUploadStore = defineStore("upload", {
   state: () => ({
-
     arquivo: null,
     dadosOriginais: [],
     dadosTratados: [],
     dadosValidados: [],
     dadosInvalidados: [],
     erros: [],
-    tiposErros:{},
-    statusValidacao: 'Aguardando o arquivo',
-    carregando: false
-
+    detalhesErros: [],
+    tiposErros: {},
+    statusValidacao: "Aguardando o arquivo",
+    carregando: false,
   }),
 
   getters: {
-
     totalClientes: (state) => state.dadosTratados.length,
 
     totalErros: (state) => state.erros.length,
 
     clientesNivelA: (state) =>
-      state.dadosTratados.filter(
-        cliente => cliente.nivel_cliente === 'A'
-      ).length,
+      state.dadosTratados.filter((cliente) => cliente.nivel_cliente === "A")
+        .length,
 
     temDados: (state) => state.dadosTratados.length > 0,
 
@@ -35,275 +30,381 @@ export const useUploadStore = defineStore('upload', {
 
     totalInvalidados: (state) => state.dadosInvalidados.length,
 
-    nomeArquivo: (state) => state.arquivo?.name || 'Nenhum arquivo selecionado',
+    nomeArquivo: (state) => state.arquivo?.name || "Nenhum arquivo selecionado",
 
     percentualValido: (state) => {
-
       if (state.dadosTratados.length === 0) {
-        return 0
+        return 0;
       }
 
       return Math.round(
-        (state.dadosValidados.length / state.dadosTratados.length) * 100
-      )
-
-    }
-
+        (state.dadosValidados.length / state.dadosTratados.length) * 100,
+      );
+    },
   },
 
   actions: {
-
     selecionarArquivo(arquivo) {
-
-      this.arquivo = arquivo
-      this.dadosOriginais = []
-      this.dadosTratados = []
-      this.dadosValidados = []
-      this.dadosInvalidados = []
-      this.statusValidacao = 'Arquivo selecionado'
-      this.erros = []
-      this.tiposErros = {}
-      this.carregando = false
+      this.arquivo = arquivo;
+      this.dadosOriginais = [];
+      this.dadosTratados = [];
+      this.dadosValidados = [];
+      this.dadosInvalidados = [];
+      this.erros = [];
+      this.detalhesErros = [];
+      this.tiposErros = {};
+      this.statusValidacao = arquivo
+        ? "Arquivo selecionado"
+        : "Aguardando o arquivo";
+      this.carregando = false;
     },
 
     validarArquivo() {
-      this.erros = []
-      this.tiposErros = {}
+      this.erros = [];
+      this.detalhesErros = [];
+      this.tiposErros = {};
 
       if (!this.arquivo) {
-        this.erros = ['Selecione um arquivo.']
-
-        this.statusValidacao = 'Nenhum arquivo selecionado.'
-        
-        return false
+        this.erros = ["Selecione um arquivo."];
+        this.statusValidacao = "Nenhum arquivo selecionado.";
+        return false;
       }
 
-      const extensoesPermitidas = ['.xlsx', '.xls', '.csv']
+      const extensoesPermitidas = [".xlsx", ".xls", ".csv"];
+      const nomeArquivo = this.arquivo.name.toLowerCase();
 
-      const nomeArquivo = this.arquivo.name.toLowerCase()
-
-      const valido = extensoesPermitidas.some(extensao =>
-        nomeArquivo.endsWith(extensao)
-      )
+      const valido = extensoesPermitidas.some((extensao) =>
+        nomeArquivo.endsWith(extensao),
+      );
 
       if (!valido) {
-        this.erros = ['Formato de arquivo não permitido.']
-
-        this.statusValidacao = 'Formato de arquivo inválido.'
-        
-        return false
+        this.erros = ["Formato de arquivo não permitido."];
+        this.statusValidacao = "Formato de arquivo inválido.";
+        return false;
       }
 
-      return true
-
+      return true;
     },
 
     async processarPlanilha() {
+      if (!this.validarArquivo()) return false;
 
-      if (!this.validarArquivo()) return
-
-      this.carregando = true
-
-      this.erros = []
-
-      this.tiposErros = {}
-
-      this.dadosOriginais = []
-
-      this.dadosTratados = []
-
-      this.dadosValidados = []
-
-      this.dadosInvalidados = []
-
-      this.statusValidacao = 'Processando arquivo'
+      this.carregando = true;
+      this.erros = [];
+      this.detalhesErros = [];
+      this.tiposErros = {};
+      this.dadosOriginais = [];
+      this.dadosTratados = [];
+      this.dadosValidados = [];
+      this.dadosInvalidados = [];
+      this.statusValidacao = "Processando arquivo";
 
       try {
+        const buffer = await this.arquivo.arrayBuffer();
 
-        const buffer = await this.arquivo.arrayBuffer()
+        const workbook = XLSX.read(buffer, {
+          type: "array",
+          cellDates: true,
+        });
 
-        const workbook = XLSX.read(buffer)
-
-        if (workbook.SheetNames.length === 0){
-          this.erros = ['A planilha não possui abas para leitura.']
-
-          this.statusValidacao = 'Planilha sem abas para leitura.'
-
-          return
+        if (workbook.SheetNames.length === 0) {
+          this.erros = ["A planilha não possui abas para leitura."];
+          this.statusValidacao = "Planilha sem abas para leitura.";
+          return false;
         }
 
-        const primeiraAba = workbook.SheetNames[0]
+        // Usa a aba da atividade quando ela existir.
+        // Para outras planilhas, utiliza a primeira aba.
+        const nomeAba = workbook.SheetNames.includes("upload_clientes")
+          ? "upload_clientes"
+          : workbook.SheetNames[0];
 
-        const planilha = workbook.Sheets[primeiraAba]
+        const planilha = workbook.Sheets[nomeAba];
 
-        const linhas = XLSX.utils.sheet_to_json(planilha)
+        const linhas = XLSX.utils.sheet_to_json(planilha, {
+          defval: "",
+          raw: true,
+          blankrows: false,
+        });
 
-        if (linhas.length === 0){
-          this.erros = ['A planilha não contém registros para validar.']
-
-          this.statusValidacao = 'Nenhum registro encontrado.'
-         
-          return
+        if (linhas.length === 0) {
+          this.erros = ["A planilha não contém registros para validar."];
+          this.statusValidacao = "Nenhum registro encontrado.";
+          return false;
         }
 
-        this.dadosOriginais = linhas
+        this.dadosOriginais = linhas;
+        this.dadosTratados = linhas.map((linha) => this.tratarLinha(linha));
 
-        this.dadosTratados = linhas.map(this.tratarLinha)
+        this.validarDados();
 
-        this.validarDados()
-
+        return true;
       } catch (error) {
+        console.error("Erro ao processar a planilha:", error);
 
-        this.erros = ['Erro ao processar a planilha.']
+        this.erros = ["Erro ao processar a planilha."];
+        this.statusValidacao = "Falha ao processar o arquivo.";
 
-        this.statusValidacao = 'Falha ao processar o arquivo.'
-
-        console.error(error)
-
+        return false;
       } finally {
-
-        this.carregando = false
-
+        this.carregando = false;
       }
-
     },
 
     tratarLinha(linha) {
+      const texto = (valor) =>
+        valor === null || valor === undefined ? "" : String(valor).trim();
 
-      const segmento = String(linha.segmento || '')
-        .trim()
-        .toUpperCase()
+      const dados = { ...linha };
+
+      dados.codigo_cliente = texto(dados.codigo_cliente).toUpperCase();
+      dados.nome_cliente = texto(dados.nome_cliente);
+      dados.consultor = texto(dados.consultor);
+      dados.nivel_cliente = texto(dados.nivel_cliente).toUpperCase();
+      dados.cidade = texto(dados.cidade);
+      dados.uf = texto(dados.uf).toUpperCase();
+      dados.servicos_contratados = texto(dados.servicos_contratados);
+
+      // Padronização dos segmentos, sem depender de acentos.
+      const segmentoOriginal = texto(dados.segmento);
+
+      const segmentoNormalizado = segmentoOriginal
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
 
       const mapaSegmentos = {
+        "IND.": "Indústria",
+        INDUSTRIA: "Indústria",
+        COMERCIO: "Comércio",
+        SERVICOS: "Serviços",
+        SAUDE: "Saúde",
+        EDUCACAO: "Educação",
+        TECNOLOGIA: "Tecnologia",
+      };
 
-        'IND.': 'Indústria',
+      dados.segmento = mapaSegmentos[segmentoNormalizado] || segmentoOriginal;
 
-        'INDUSTRIA': 'Indústria',
+      // Converte faturamento textual para número quando possível.
+      const faturamento = dados.faturamento_anual;
 
-        'INDÚSTRIA': 'Indústria',
+      if (typeof faturamento === "string") {
+        const valor = faturamento.trim();
 
-        'COMERCIO': 'Comércio',
+        if (valor === "") {
+          dados.faturamento_anual = "";
+        } else {
+          const convertido = Number(valor.replace(/\./g, "").replace(",", "."));
 
-        'COMÉRCIO': 'Comércio',
-
-        'SERVICOS': 'Serviços',
-
-        'SERVIÇOS': 'Serviços'
-
+          dados.faturamento_anual = Number.isFinite(convertido)
+            ? convertido
+            : valor;
+        }
       }
 
-      return {
+      // Normaliza datas para DD/MM/AAAA.
+      const data = dados.data_contratacao;
 
-        ...linha,
+      if (data instanceof Date && !Number.isNaN(data.getTime())) {
+        const dia = String(data.getDate()).padStart(2, "0");
+        const mes = String(data.getMonth() + 1).padStart(2, "0");
+        const ano = data.getFullYear();
 
-        codigo_cliente: String(linha.codigo_cliente || '').trim(),
+        dados.data_contratacao = `${dia}/${mes}/${ano}`;
+      } else if (typeof data === "number" && Number.isFinite(data)) {
+        const dataExcel = XLSX.SSF.parse_date_code(data);
 
-        nome_cliente: String(linha.nome_cliente || '').trim(),
+        if (dataExcel) {
+          const dia = String(dataExcel.d).padStart(2, "0");
+          const mes = String(dataExcel.m).padStart(2, "0");
+          const ano = dataExcel.y;
 
-        consultor: String(linha.consultor || '').trim(),
-
-        segmento: mapaSegmentos[segmento] || segmento,
-
-        nivel_cliente: String(linha.nivel_cliente || '')
-          .trim()
-          .toUpperCase()
-
+          dados.data_contratacao = `${dia}/${mes}/${ano}`;
+        }
+      } else {
+        dados.data_contratacao = texto(data);
       }
 
+      return dados;
     },
 
     validarDados() {
+      this.dadosValidados = [];
+      this.dadosInvalidados = [];
+      this.erros = [];
+      this.detalhesErros = [];
+      this.tiposErros = {};
 
-      this.dadosValidados = []
+      const codigos = new Set();
 
-      this.dadosInvalidados = []
-
-      this.erros = []
-
-      this.tiposErros = {}
-
-      const codigos = new Set()
+      // Estes são os campos da planilha da atividade.
+      // Por enquanto, os dez são tratados como obrigatórios.
+      const camposObrigatorios = [
+        ["codigo_cliente", "Código do cliente"],
+        ["nome_cliente", "Nome do cliente"],
+        ["consultor", "Consultor"],
+        ["segmento", "Segmento"],
+        ["nivel_cliente", "Nível do cliente"],
+        ["faturamento_anual", "Faturamento anual"],
+        ["servicos_contratados", "Serviços contratados"],
+        ["data_contratacao", "Data de contratação"],
+        ["cidade", "Cidade"],
+        ["uf", "UF"],
+      ];
 
       this.dadosTratados.forEach((linha, index) => {
+        const numeroLinha = index + 2;
+        const errosLinha = [];
+        const detalhesLinha = [];
 
-        const errosLinha = []
+        const registrarErro = (campo, tipo, descricao) => {
+          const detalhe = {
+            linha: numeroLinha,
+            campo,
+            tipo,
+            descricao,
+          };
 
-        const numeroLinha = index + 2
+          errosLinha.push(descricao);
+          detalhesLinha.push(detalhe);
+          this.detalhesErros.push(detalhe);
 
-        // Código obrigatório
-        if (!String(linha.codigo_cliente || '').trim()) {
-          errosLinha.push('Código do cliente está vazio.')
+          this.erros.push(`Linha ${numeroLinha} — ${campo}: ${descricao}`);
+
+          this.tiposErros[tipo] = (this.tiposErros[tipo] || 0) + 1;
+        };
+
+        // Verifica o preenchimento dos campos.
+        camposObrigatorios.forEach(([campo, nomeCampo]) => {
+          const valor = linha[campo];
+
+          if (
+            valor === null ||
+            valor === undefined ||
+            String(valor).trim() === ""
+          ) {
+            registrarErro(
+              nomeCampo,
+              "Campo obrigatório",
+              `${nomeCampo} não foi preenchido.`,
+            );
+          }
+        });
+
+        // O nível do cliente deve ser A, B ou C.
+        if (
+          linha.nivel_cliente &&
+          !["A", "B", "C"].includes(linha.nivel_cliente)
+        ) {
+          registrarErro(
+            "Nível do cliente",
+            "Nível inválido",
+            "O nível deve ser A, B ou C.",
+          );
         }
 
-        // Nome obrigatório
-        if (!String(linha.nome_cliente || '').trim()){
-          errosLinha.push('Nome do cliente está vazio.')
-        }
-
-        // Consultor obrigatório
-        if (!linha.consultor) {
-          errosLinha.push('Consultor está vazio.')
-        }
-
-        // Segmento obrigatório
-        if (!linha.segmento) {
-          errosLinha.push('Segmento está vazio.')
-        }
-
-        // Nível deve ser A, B ou C
-        if (!['A', 'B', 'C'].includes(linha.nivel_cliente)) {
-          errosLinha.push('Nível do cliente deve ser A, B ou C.')
-        }
-
-        // Verificar código duplicado
-        const codigo = String(linha.codigo_cliente || '').trim()
+        // Verifica códigos duplicados.
+        const codigo = String(linha.codigo_cliente || "")
+          .trim()
+          .toUpperCase();
 
         if (codigo) {
-          if (codigos.has(codigo)){
-            errosLinha.push('Código do cliente duplicado.')
+          if (codigos.has(codigo)) {
+            registrarErro(
+              "Código do cliente",
+              "Código duplicado",
+              `O código ${codigo} já apareceu em outro registro.`,
+            );
+          } else {
+            codigos.add(codigo);
           }
-
-          codigos.add(codigo)
-
         }
-        // Separar válido e inválido
+
+        // O faturamento precisa ser numérico e não negativo.
+        const faturamento = linha.faturamento_anual;
+
+        if (
+          faturamento !== "" &&
+          faturamento !== null &&
+          faturamento !== undefined
+        ) {
+          if (
+            typeof faturamento !== "number" ||
+            !Number.isFinite(faturamento)
+          ) {
+            registrarErro(
+              "Faturamento anual",
+              "Faturamento inválido",
+              "O faturamento deve ser um número válido.",
+            );
+          } else if (faturamento < 0) {
+            registrarErro(
+              "Faturamento anual",
+              "Faturamento inválido",
+              "O faturamento não pode ser negativo.",
+            );
+          }
+        }
+
+        // Verifica a data e o formato DD/MM/AAAA.
+        const data = String(linha.data_contratacao || "").trim();
+
+        if (data) {
+          const correspondencia = data.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+          if (correspondencia) {
+            const dia = Number(correspondencia[1]);
+            const mes = Number(correspondencia[2]);
+            const ano = Number(correspondencia[3]);
+
+            const dataTeste = new Date(ano, mes - 1, dia);
+
+            const dataValida =
+              dataTeste.getFullYear() === ano &&
+              dataTeste.getMonth() === mes - 1 &&
+              dataTeste.getDate() === dia;
+
+            if (!dataValida) {
+              registrarErro(
+                "Data de contratação",
+                "Data inválida",
+                "A data informada não existe no calendário.",
+              );
+            }
+          } else {
+            registrarErro(
+              "Data de contratação",
+              "Data inválida",
+              "Utilize o formato DD/MM/AAAA.",
+            );
+          }
+        }
+
+        // A UF deve conter duas letras.
+        if (linha.uf && !/^[A-Z]{2}$/.test(linha.uf)) {
+          registrarErro("UF", "UF inválida", "A UF deve conter duas letras.");
+        }
+
+        // Se houver erros, o registro fica como inválido.
         if (errosLinha.length === 0) {
-
-          this.dadosValidados.push(linha)
-
+          this.dadosValidados.push(linha);
         } else {
-
           this.dadosInvalidados.push({
             ...linha,
-            erros: errosLinha
-          })
-
-          errosLinha.forEach(erro => {
-            this.erros.push(`Linha ${numeroLinha}: ${erro}`)
-
-            if (!this.tiposErros[erro]){
-              this.tiposErros[erro] = 0
-            }
-
-            this.tiposErros[erro]++
-          })
-
+            linhaPlanilha: numeroLinha,
+            erros: errosLinha,
+            detalhesErros: detalhesLinha,
+          });
         }
-
-      })
+      });
 
       if (this.dadosInvalidados.length === 0) {
-
-        this.statusValidacao = 'Validação concluída com sucesso.'
-
+        this.statusValidacao = "Validação concluída com sucesso.";
       } else {
-
-        this.statusValidacao = 'Arquivo possui inconsistências.'
-
+        this.statusValidacao = "Arquivo possui inconsistências.";
       }
 
-    }
-
-  }
-
-})
+      return this.dadosInvalidados.length === 0;
+    },
+  },
+});
