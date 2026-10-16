@@ -1,4 +1,14 @@
 @import "tailwindcss";
 
-/* Procura classes do Tailwind nos componentes Vue */
 @source "./**/*.vue";
+
+@theme {
+  --color-cti-bg: #0b1220;
+  --color-cti-sidebar: #111c30;
+  --color-cti-card: #17263d;
+  --color-cti-border: #26364d;
+  --color-cti-cyan: #12b8d0;
+  --color-cti-turquoise: #2dd4bf;
+  --color-cti-text: #e2e8f0;
+  --color-cti-muted: #94a3b8;
+}

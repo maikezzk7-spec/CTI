@@ -83,27 +83,13 @@
     <!-- Botão Sair -->
     <router-link
       to="/"
-      class="flex items-center gap-3 rounded-lg px-4 py-3 text-red-400 transition-colors hover:bg-slate-800 hover:text-red-300"
+      class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-300 transition-all duration-300 hover:bg-blue-600 hover:text-white"
     >
-      <!-- Ícone de saída feito em CSS -->
-      <span
-        class="relative flex h-6 w-6 items-center justify-center"
+      <!-- Ícone Font Awesome -->
+      <i
+        class="fa-solid fa-door-open text-xl"
         aria-hidden="true"
-      >
-        <!-- Porta -->
-        <span
-          class="absolute left-1 top-0.5 h-5 w-3.5 rounded-sm border-2 border-current"
-        ></span>
-
-        <!-- Seta de saída -->
-        <span
-          class="absolute right-0 top-2.5 h-0.5 w-3 bg-current"
-        ></span>
-
-        <span
-          class="absolute right-0.5 top-1.5 h-2 w-2 rotate-45 border-r-2 border-t-2 border-current"
-        ></span>
-      </span>
+      ></i>
 
       <span>Sair</span>
     </router-link>
