@@ -1,4 +1,3 @@
-```vue
 <template>
   <div class="min-h-screen bg-cti-bg p-4 text-cti-text sm:p-6 lg:p-8">
     <!-- Cabeçalho da página -->
@@ -404,4 +403,3 @@ import { useUploadStore } from "../stores/uploadStore";
 
 const store = useUploadStore();
 </script>
-```

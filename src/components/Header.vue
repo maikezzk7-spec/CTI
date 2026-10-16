@@ -1,4 +1,3 @@
-```vue
 <template>
   <header
     class="flex min-h-14 items-center border-b border-cti-border bg-cti-bg px-4 py-3 sm:px-6"
@@ -14,4 +13,3 @@
     </div>
   </header>
 </template>
-```
