@@ -435,6 +435,7 @@
   </div>
 </template>
 
+
 <script setup>
 import { computed, ref } from "vue";
 import { useUploadStore } from "../stores/uploadStore";
@@ -444,10 +445,32 @@ const uploadStore = useUploadStore();
 const arrastando = ref(false);
 const nomeArquivo = ref("");
 
+function formatoPermitido(arquivo) {
+  const extensao = arquivo.name.split(".").pop()?.toLowerCase();
+
+  return ["xlsx", "xls", "csv"].includes(extensao);
+}
+
+function recusarArquivo() {
+  // Impede que um arquivo anteriormente selecionado continue disponível.
+  uploadStore.selecionarArquivo(null);
+  nomeArquivo.value = "";
+
+  // Exibe o aviso na própria tela.
+  uploadStore.erros = [
+    "Formato de arquivo não permitido. Selecione um arquivo XLSX, XLS ou CSV.",
+  ];
+  uploadStore.statusValidacao = "Formato de arquivo inválido.";
+}
+
 function selecionarArquivo(event) {
   const arquivo = event.target.files[0];
 
-  if (arquivo) {
+  if (!arquivo) return;
+
+  if (!formatoPermitido(arquivo)) {
+    recusarArquivo();
+  } else {
     nomeArquivo.value = arquivo.name;
     uploadStore.selecionarArquivo(arquivo);
   }
@@ -467,14 +490,20 @@ function aoSairDaArea(event) {
 }
 
 function aoSoltarArquivo(event) {
+  event.preventDefault();
   arrastando.value = false;
 
   const arquivo = event.dataTransfer.files[0];
 
-  if (arquivo) {
-    nomeArquivo.value = arquivo.name;
-    uploadStore.selecionarArquivo(arquivo);
+  if (!arquivo) return;
+
+  if (!formatoPermitido(arquivo)) {
+    recusarArquivo();
+    return;
   }
+
+  nomeArquivo.value = arquivo.name;
+  uploadStore.selecionarArquivo(arquivo);
 }
 
 async function processarPlanilha() {
