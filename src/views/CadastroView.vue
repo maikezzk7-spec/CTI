@@ -97,6 +97,12 @@ function voltarLogin() {
           "
         ></div>
 
+        <!-- Iluninação decorativa -->
+        <div
+          aria-hidden="true"
+          class="pointer-events-none absolute -right-24 top-32 h-72 w-72 rounded-full bg-[#38BDF8]/10 blur-3xl"
+        ></div>
+
         <div class="relative z-10 flex items-center gap-3">
           <div
             class="flex h-11 w-11 items-center justify-center rounded-xl border border-[#38BDF8]/30 bg-[#38BDF8]/10"
@@ -137,7 +143,7 @@ function voltarLogin() {
             <div
               v-for="recurso in recursos"
               :key="recurso.titulo"
-              class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-md"
+              class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-[#38BDF8]/30 hover:bg-white/10"
             >
               <div
                 class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#38BDF8]/20 bg-[#38BDF8]/10"
