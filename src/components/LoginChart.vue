@@ -12,8 +12,7 @@ onMounted(() => {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const gradiente = ctx.createLinearGradient(0, 0, 0, 230)
-
+  const gradiente = ctx.createLinearGradient(0, 0, 0, 200)
   gradiente.addColorStop(0, 'rgba(56, 189, 248, 0.32)')
   gradiente.addColorStop(1, 'rgba(56, 189, 248, 0)')
 
@@ -30,7 +29,6 @@ onMounted(() => {
 
           borderColor: '#38BDF8',
           backgroundColor: gradiente,
-
           borderWidth: 3,
           fill: true,
           tension: 0.4,
@@ -49,7 +47,7 @@ onMounted(() => {
       maintainAspectRatio: false,
 
       animation: {
-        duration: 1200,
+        duration: 1000,
         easing: 'easeOutQuart'
       },
 
@@ -71,6 +69,7 @@ onMounted(() => {
           borderWidth: 1,
           padding: 12,
           displayColors: false,
+
           callbacks: {
             label: (context) =>
               `${context.parsed.y} registros (demonstração)`
@@ -130,7 +129,7 @@ onBeforeUnmount(() => {
   <div
     class="rounded-2xl border border-[#38BDF8]/15 bg-slate-950/35 p-4 shadow-lg shadow-black/10 backdrop-blur-md"
   >
-    <div class="mb-4 flex items-start justify-between gap-3">
+    <div class="mb-3 flex items-start justify-between gap-3">
       <div>
         <h3 class="flex items-center gap-2 text-sm font-bold text-white">
           <i class="fa-solid fa-chart-line text-[#38BDF8]"></i>
@@ -149,7 +148,8 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <div class="relative h-44 w-full">
+    <!-- Gráfico mais compacto -->
+    <div class="relative h-36 w-full xl:h-40">
       <canvas
         ref="canvasRef"
         role="img"

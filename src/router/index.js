@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // Páginas Públicas
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
+import CadastroView from '../views/CadastroView.vue'
 
 // Layout do Painel
 import AppLayout from '../layouts/AppLayout.vue'
@@ -25,6 +26,13 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginView
+  },
+
+  // Cadastro de usuários
+  {
+    path: '/cadastro',
+    name: 'cadastro',
+    component: CadastroView
   },
 
   // Painel interno
