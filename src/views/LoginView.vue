@@ -50,7 +50,7 @@ async function entrar() {
 
 <template>
   <main
-    class="relative flex min-h-screen min-h-dvh items-center justify-center bg-[#020617] px-3 py-4 text-white sm:px-6 sm:py-8 xl:px-8"
+    class="relative flex min-h-screen min-h-dvh items-center justify-center overflow-clip bg-[#020617] px-3 py-4 text-white sm:px-6 sm:py-8 xl:px-8"
   >
     <!-- Efeitos luminosos -->
     <div
