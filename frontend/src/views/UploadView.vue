@@ -1,10 +1,12 @@
-
 <template>
   <div class="space-y-6 text-cti-text">
     <!-- Cabeçalho -->
     <header class="mb-6">
       <div class="mb-2 flex items-center gap-2 text-sm text-cti-cyan">
-        <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
+        <i
+          class="fa-solid fa-cloud-arrow-up"
+          aria-hidden="true"
+        ></i>
         <span>Importação de dados</span>
       </div>
 
@@ -25,7 +27,10 @@
         <div
           class="flex h-11 w-11 items-center justify-center rounded-xl bg-cti-cyan/10 text-cti-cyan"
         >
-          <i class="fa-solid fa-file-excel text-xl" aria-hidden="true"></i>
+          <i
+            class="fa-solid fa-file-excel text-xl"
+            aria-hidden="true"
+          ></i>
         </div>
 
         <div>
@@ -71,7 +76,10 @@
           v-if="nomeArquivo"
           class="mt-3 max-w-full break-all rounded-lg bg-cti-cyan/10 px-3 py-2 text-sm text-cti-cyan"
         >
-          <i class="fa-solid fa-file-lines mr-2" aria-hidden="true"></i>
+          <i
+            class="fa-solid fa-file-lines mr-2"
+            aria-hidden="true"
+          ></i>
           {{ nomeArquivo }}
         </span>
 
@@ -160,7 +168,10 @@
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm text-cti-muted">Total de clientes</p>
+              <p class="text-sm text-cti-muted">
+                Total de clientes
+              </p>
+
               <strong class="mt-3 block text-3xl font-bold">
                 {{ uploadStore.totalClientes }}
               </strong>
@@ -184,8 +195,13 @@
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm text-cti-muted">Clientes nível A</p>
-              <strong class="mt-3 block text-3xl font-bold text-cti-cyan">
+              <p class="text-sm text-cti-muted">
+                Clientes nível A
+              </p>
+
+              <strong
+                class="mt-3 block text-3xl font-bold text-cti-cyan"
+              >
                 {{ uploadStore.clientesNivelA }}
               </strong>
             </div>
@@ -208,8 +224,13 @@
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm text-cti-muted">Clientes validados</p>
-              <strong class="mt-3 block text-3xl font-bold text-green-400">
+              <p class="text-sm text-cti-muted">
+                Clientes validados
+              </p>
+
+              <strong
+                class="mt-3 block text-3xl font-bold text-green-400"
+              >
                 {{ uploadStore.totalValidados }}
               </strong>
             </div>
@@ -217,7 +238,10 @@
             <span
               class="flex h-11 w-11 items-center justify-center rounded-xl bg-green-400/10 text-green-400"
             >
-              <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+              <i
+                class="fa-solid fa-circle-check"
+                aria-hidden="true"
+              ></i>
             </span>
           </div>
 
@@ -232,8 +256,13 @@
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm text-cti-muted">Clientes invalidados</p>
-              <strong class="mt-3 block text-3xl font-bold text-red-400">
+              <p class="text-sm text-cti-muted">
+                Clientes invalidados
+              </p>
+
+              <strong
+                class="mt-3 block text-3xl font-bold text-red-400"
+              >
                 {{ uploadStore.totalInvalidados }}
               </strong>
             </div>
@@ -259,8 +288,13 @@
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm text-cti-muted">Percentual válido</p>
-              <strong class="mt-3 block text-3xl font-bold text-cti-cyan">
+              <p class="text-sm text-cti-muted">
+                Percentual válido
+              </p>
+
+              <strong
+                class="mt-3 block text-3xl font-bold text-cti-cyan"
+              >
                 {{ uploadStore.percentualValido }}%
               </strong>
             </div>
@@ -268,14 +302,21 @@
             <span
               class="flex h-11 w-11 items-center justify-center rounded-xl bg-cti-cyan/10 text-cti-cyan"
             >
-              <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+              <i
+                class="fa-solid fa-chart-pie"
+                aria-hidden="true"
+              ></i>
             </span>
           </div>
 
-          <div class="mt-4 h-2 overflow-hidden rounded-full bg-cti-border">
+          <div
+            class="mt-4 h-2 overflow-hidden rounded-full bg-cti-border"
+          >
             <div
               class="h-full rounded-full bg-gradient-to-r from-cti-cyan to-cti-turquoise transition-all duration-500"
-              :style="{ width: `${uploadStore.percentualValido}%` }"
+              :style="{
+                width: `${uploadStore.percentualValido}%`
+              }"
             ></div>
           </div>
         </article>
@@ -286,8 +327,13 @@
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm text-cti-muted">Total de erros</p>
-              <strong class="mt-3 block text-3xl font-bold text-amber-400">
+              <p class="text-sm text-cti-muted">
+                Total de erros
+              </p>
+
+              <strong
+                class="mt-3 block text-3xl font-bold text-amber-400"
+              >
                 {{ uploadStore.totalErros }}
               </strong>
             </div>
@@ -312,7 +358,10 @@
       class="rounded-2xl border border-cti-border bg-cti-card p-5 sm:p-6"
     >
       <div class="mb-5">
-        <h2 class="text-xl font-bold">Clientes invalidados</h2>
+        <h2 class="text-xl font-bold">
+          Clientes invalidados
+        </h2>
+
         <p class="mt-1 text-sm text-cti-muted">
           Consulte os registros que precisam de correção.
         </p>
@@ -326,7 +375,10 @@
         >
           <div class="mb-4 flex items-start justify-between gap-3">
             <div>
-              <p class="text-xs text-cti-muted">Código do cliente</p>
+              <p class="text-xs text-cti-muted">
+                Código do cliente
+              </p>
+
               <h3 class="mt-1 font-semibold">
                 {{ cliente.codigo_cliente || "Não informado" }}
               </h3>
@@ -378,8 +430,13 @@
               Erros encontrados
             </p>
 
-            <ul class="list-inside list-disc space-y-1 text-sm text-cti-muted">
-              <li v-for="(erro, erroIndex) in cliente.erros" :key="erroIndex">
+            <ul
+              class="list-inside list-disc space-y-1 text-sm text-cti-muted"
+            >
+              <li
+                v-for="(erro, erroIndex) in cliente.erros"
+                :key="erroIndex"
+              >
                 {{ erro }}
               </li>
             </ul>
@@ -394,14 +451,21 @@
       class="rounded-2xl border border-cti-border bg-cti-card p-5 sm:p-6"
     >
       <div class="mb-5">
-        <h2 class="text-xl font-bold">Prévia dos dados</h2>
+        <h2 class="text-xl font-bold">
+          Prévia dos dados
+        </h2>
+
         <p class="mt-1 text-sm text-cti-muted">
           Confira os registros importados da planilha.
         </p>
       </div>
 
-      <div class="overflow-x-auto rounded-xl border border-cti-border">
-        <table class="w-full min-w-max border-collapse text-left text-sm">
+      <div
+        class="overflow-x-auto rounded-xl border border-cti-border"
+      >
+        <table
+          class="w-full min-w-max border-collapse text-left text-sm"
+        >
           <thead class="bg-cti-panel text-cti-muted">
             <tr>
               <th
@@ -435,7 +499,6 @@
   </div>
 </template>
 
-
 <script setup>
 import { computed, ref } from "vue";
 import { useUploadStore } from "../stores/uploadStore";
@@ -446,21 +509,27 @@ const arrastando = ref(false);
 const nomeArquivo = ref("");
 
 function formatoPermitido(arquivo) {
-  const extensao = arquivo.name.split(".").pop()?.toLowerCase();
+  const extensao = arquivo.name
+    .split(".")
+    .pop()
+    ?.toLowerCase();
 
   return ["xlsx", "xls", "csv"].includes(extensao);
 }
 
 function recusarArquivo() {
-  // Impede que um arquivo anteriormente selecionado continue disponível.
+  // Impede que um arquivo anteriormente selecionado
+  // continue disponível.
   uploadStore.selecionarArquivo(null);
   nomeArquivo.value = "";
 
   // Exibe o aviso na própria tela.
   uploadStore.erros = [
-    "Formato de arquivo não permitido. Selecione um arquivo XLSX, XLS ou CSV.",
+    "Formato de arquivo não permitido. Selecione um arquivo XLSX, XLS ou CSV."
   ];
-  uploadStore.statusValidacao = "Formato de arquivo inválido.";
+
+  uploadStore.statusValidacao =
+    "Formato de arquivo inválido.";
 }
 
 function selecionarArquivo(event) {
