@@ -1,19 +1,21 @@
-package com.cti.provedor;                                // pacote desta classe
+package com.cti.provedor;
+
 // ============================================================================
-// O botão LIGAR do backend.
-// Tem o método main: o Java começa a rodar por aqui e o Spring Boot liga o servidor.
-// Quem usa: você, ao rodar 'mvn spring-boot:run'.
+// Classe principal do backend CTI Insights.
+// Inicializa o Spring Boot e habilita tarefas automáticas agendadas.
 // ============================================================================
 
-import com.cti.provedor.config.AppProperties;                      // import: a configuração AppProperties
-import org.springframework.boot.SpringApplication;                               // import: traz a classe que liga o Spring Boot
-import org.springframework.boot.autoconfigure.SpringBootApplication;             // import: traz a anotação que ativa a configuração automática
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;  // import: traz a anotação que lê a seção "app" do application.properties
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication                                                           // diz: esta é a aplicação Spring Boot (liga tudo sozinho)
-@ConfigurationPropertiesScan                                                     // procura as classes de configuração (AppProperties)
-public class CtiProvedorApplication {                                            // classe principal do backend
-    public static void main(String[] args) {                                     // main: o Java começa a executar por aqui
-        SpringApplication.run(CtiProvedorApplication.class, args);               // sobe o servidor web na porta 8080
-    }                                                                            // fecha o bloco
-}                                                                                // fecha o bloco
+@SpringBootApplication
+@ConfigurationPropertiesScan
+@EnableScheduling
+public class CtiProvedorApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CtiProvedorApplication.class, args);
+    }
+}

@@ -1,53 +1,151 @@
-package com.cti.provedor.config;                       // pacote desta classe
-// ============================================================================
-// O porteiro do token.
-// Em TODA requisição, lê o token do cabeçalho Authorization e diz ao Spring quem é o usuário.
-// Roda sozinho antes dos controllers.
-// ============================================================================
+package com.cti.provedor.config;
 
-import jakarta.servlet.FilterChain;                                                 // import: a cadeia de filtros (o próximo filtro)
-import jakarta.servlet.ServletException;                                            // import: erro de servlet
-import jakarta.servlet.http.HttpServletRequest;                                     // import: o pedido HTTP que chegou
-import jakarta.servlet.http.HttpServletResponse;                                    // import: a resposta HTTP
-import java.io.IOException;                                                         // import: erro de entrada/saída
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;  // import: objeto "usuário autenticado" do Spring Security
-import org.springframework.security.core.context.SecurityContextHolder;             // import: onde o Security guarda quem está logado neste pedido
-import org.springframework.security.core.userdetails.UserDetails;                   // import: dados do usuário
-import org.springframework.security.core.userdetails.UsernameNotFoundException;     // import: erro de usuário inexistente
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;  // import: anexa IP e sessão ao usuário autenticado
-import org.springframework.web.filter.OncePerRequestFilter;                         // import: filtro que roda uma vez por pedido
+import com.cti.provedor.model.Usuario;
+import com.cti.provedor.repository.UsuarioRepository;
+import com.cti.provedor.service.RevogacaoTokenService;
 
-/** Lê "Authorization: Bearer <token>", valida e autentica a requisição. */
-public class JwtAuthenticationFilter extends OncePerRequestFilter {                 // FILTRO: roda antes de cada rota e confere o token JWT
-    private final JwtService jwtService;                                            // serviço que lê e valida o token
-    private final UsuarioDetailsService detailsService;                             // serviço que busca o usuário no banco
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UsuarioDetailsService detailsService) {  // construtor: o Spring entrega os dois serviços
-        this.jwtService = jwtService;                                               // guarda o serviço do JWT
-        this.detailsService = detailsService;                                       // guarda o serviço de usuários
-    }                                                                               // fecha o bloco
+import java.io.IOException;
 
-    @Override                                       // sobrescreve o método da classe mãe
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)  // método que roda a cada pedido
-            throws ServletException, IOException {  // pode lançar erros de servlet ou de entrada/saída
-        String cabecalho = request.getHeader("Authorization");                      // lê o cabeçalho Authorization do pedido
-        if (cabecalho != null && cabecalho.startsWith("Bearer ")                    // veio no formato "Bearer <token>"?
-                && SecurityContextHolder.getContext().getAuthentication() == null) {  // e ainda não há ninguém autenticado neste pedido?
-            String token = cabecalho.substring(7).trim();                           // tira o "Bearer " e fica só com o token
-            jwtService.emailDoToken(token).ifPresent(email -> {                     // se o token é válido, pega o e-mail que está dentro dele
-                try {                               // tenta carregar o usuário
-                    UserDetails usuario = detailsService.loadUserByUsername(email);  // busca o usuário no banco pelo e-mail
-                    // Se o admin bloquear a conta, o token antigo deixa de valer na hora.
-                    if (usuario.isEnabled()) {                                      // conta bloqueada ou pendente não passa
-                        var auth = new UsernamePasswordAuthenticationToken(usuario, null, usuario.getAuthorities());  // cria o "usuário autenticado" com seus papéis (ROLE_...)
-                        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));  // anexa detalhes do pedido
-                        SecurityContextHolder.getContext().setAuthentication(auth);  // marca o pedido como autenticado
-                    }                                                               // fecha o bloco
-                } catch (UsernameNotFoundException ignorado) {                      // usuário apagado do banco
-                    // token de usuário que não existe mais: segue sem autenticar (vai dar 401)
-                }                                                                   // fecha o bloco
-            });                                                                     // fecha o bloco
-        }                                                                           // fecha o bloco
-        chain.doFilter(request, response);                                          // passa o pedido para o próximo filtro / a rota
-    }                                                                               // fecha o bloco
-}                                                                                   // fecha o bloco
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+public class JwtAuthenticationFilter
+        extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UsuarioDetailsService detailsService;
+    private final UsuarioRepository usuarioRepository;
+    private final RevogacaoTokenService revogacao;
+
+    public JwtAuthenticationFilter(
+            JwtService jwtService,
+            UsuarioDetailsService detailsService,
+            UsuarioRepository usuarioRepository,
+            RevogacaoTokenService revogacao) {
+
+        this.jwtService = jwtService;
+        this.detailsService = detailsService;
+        this.usuarioRepository = usuarioRepository;
+        this.revogacao = revogacao;
+    }
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain chain)
+            throws ServletException, IOException {
+
+        if (SecurityContextHolder.getContext()
+                .getAuthentication() == null) {
+
+            String token = extrairTokenCookie(request);
+
+            if (token != null) {
+                autenticarToken(token, request);
+            }
+        }
+
+        chain.doFilter(request, response);
+    }
+
+    private String extrairTokenCookie(
+            HttpServletRequest request) {
+
+        Cookie[] cookies = request.getCookies();
+
+        if (cookies == null) {
+            return null;
+        }
+
+        String tokenEncontrado = null;
+
+        for (Cookie cookie : cookies) {
+
+            if (AuthCookieService.NOME_COOKIE.equals(
+                    cookie.getName())) {
+
+                String valor = cookie.getValue();
+
+                if (valor == null || valor.isBlank()) {
+                    return null;
+                }
+
+                // Não aceitar cookies duplicados de autenticação.
+                if (tokenEncontrado != null) {
+                    return null;
+                }
+
+                tokenEncontrado = valor;
+            }
+        }
+
+        return tokenEncontrado;
+    }
+
+    private void autenticarToken(
+            String token,
+            HttpServletRequest request) {
+
+        jwtService.emailDoToken(token)
+            .ifPresent(email -> {
+
+                try {
+                    if (revogacao.estaRevogado(token)) {
+                        return;
+                    }
+
+                    Usuario usuario = usuarioRepository
+                        .findByEmailIgnoreCase(email)
+                        .orElse(null);
+
+                    if (usuario == null) {
+                        return;
+                    }
+
+                    if (!jwtService.versaoSessaoValida(
+                            token,
+                            usuario.getVersaoSessao())) {
+                        return;
+                    }
+
+                    UserDetails detalhes =
+                        detailsService.loadUserByUsername(
+                            email
+                        );
+
+                    if (!detalhes.isEnabled()) {
+                        return;
+                    }
+
+                    var autenticacao =
+                        new UsernamePasswordAuthenticationToken(
+                            detalhes,
+                            null,
+                            detalhes.getAuthorities()
+                        );
+
+                    autenticacao.setDetails(
+                        new WebAuthenticationDetailsSource()
+                            .buildDetails(request)
+                    );
+
+                    SecurityContextHolder.getContext()
+                        .setAuthentication(autenticacao);
+
+                } catch (UsernameNotFoundException e) {
+                    SecurityContextHolder.clearContext();
+                }
+            });
+    }
+}

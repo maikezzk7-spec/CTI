@@ -1,50 +1,170 @@
-package com.cti.provedor.controller;                     // pacote desta classe
-// ============================================================================
-//Porta de entrada do login.
-// POST /auth/register (cadastro), POST /auth/login (token), GET /auth/me e GET /health.
-// Chama: AuthService.
-// ============================================================================
+package com.cti.provedor.controller;
 
-import com.cti.provedor.service.AuthService;                       // import: o serviço AuthService
-import com.cti.provedor.dto.AuthDtos.*;                                        // import: os formatos de entrada/saída (CadastroRequest...)
-import com.cti.provedor.dto.UsuarioDto;                                     // import: DTO do usuário
-import com.cti.provedor.service.UsuarioService;                                 // import: serviço de usuários
-import jakarta.validation.Valid;                                                    // import: @Valid ativa as validações do DTO
-import java.util.Map;                                                               // import: tipo mapa
-import org.springframework.http.HttpStatus;                                         // import: códigos HTTP
-import org.springframework.security.core.Authentication;                            // import: usuário logado
-import org.springframework.web.bind.annotation.*;                                   // import: anotações do Spring MVC
+import com.cti.provedor.config.AuthCookieService;
+import com.cti.provedor.dto.AuthDtos.*;
+import com.cti.provedor.dto.UsuarioDto;
+import com.cti.provedor.service.AuthService;
+import com.cti.provedor.service.UsuarioService;
+import com.cti.provedor.service.RevogacaoTokenService;
 
-@RestController                                                                     // controller REST de cadastro e login
-@RequestMapping("/api")                                                             // rotas começam com /api
-public class AuthController {                                                       // classe do controller
-    private final AuthService auth;                                                 // serviço com a regra de cadastro/login
-    private final UsuarioService usuarios;                                          // serviço de usuários
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 
-    public AuthController(AuthService auth, UsuarioService usuarios) {              // construtor: o Spring entrega os serviços
-        this.auth = auth;                                                           // guarda o serviço de autenticação
-        this.usuarios = usuarios;                                                   // guarda o serviço de usuários
-    }                                                                               // fecha o bloco
+import java.util.Map;
 
-    @PostMapping("/auth/register")                                                  // POST /api/auth/register: cria conta
-    @ResponseStatus(HttpStatus.CREATED)                                             // responde 201 (criado)
-    public MensagemResponse cadastrar(@Valid @RequestBody CadastroRequest req) {    // @Valid confere os campos; @RequestBody lê o JSON
-        return auth.cadastrar(req);                                                 // cria o usuário como PENDENTE
-    }                                                                               // fecha o bloco
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
-    @PostMapping("/auth/login")                                                     // POST /api/auth/login: entra
-    public LoginResponse entrar(@Valid @RequestBody LoginRequest req) {             // lê e valida o JSON { email, senha }
-        return auth.entrar(req);                                                    // confere a senha e devolve o token JWT
-    }                                                                               // fecha o bloco
+@RestController
+@RequestMapping("/api")
+public class AuthController {
 
-    @GetMapping("/auth/me")                                                         // GET /api/auth/me: quem sou eu
-    public UsuarioDto eu(Authentication authentication) {                           // authentication vem do token enviado
-        return UsuarioDto.de(usuarios.atual(authentication));                       // devolve os dados do usuário logado
-    }                                                                               // fecha o bloco
+    private final AuthService auth;
+    private final UsuarioService usuarios;
+    private final AuthCookieService cookies;
+    private final CsrfTokenRepository csrfRepository;
+    private final RevogacaoTokenService revogacao;
 
-    /** Para testar se o servidor está no ar. */
-    @GetMapping("/health")                                                          // GET /api/health
-    public Map<String, String> saude() {                                            // método da rota de saúde
-        return Map.of("status", "ok");                                              // devolve { "status": "ok" }
-    }                                                                               // fecha o bloco
-}                                                                                   // fecha o bloco
+    public AuthController(
+            AuthService auth,
+            UsuarioService usuarios,
+            AuthCookieService cookies,
+            CsrfTokenRepository csrfRepository,
+            RevogacaoTokenService revogacao) {
+
+        this.auth = auth;
+        this.usuarios = usuarios;
+        this.cookies = cookies;
+        this.csrfRepository = csrfRepository;
+        this.revogacao = revogacao;
+    }
+
+    @GetMapping("/auth/csrf")
+    public Map<String, String> csrf(CsrfToken token) {
+        return Map.of(
+            "headerName", token.getHeaderName(),
+            "token", token.getToken()
+        );
+    }
+
+    @PostMapping("/auth/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public MensagemResponse cadastrar(
+            @Valid @RequestBody CadastroRequest req) {
+        return auth.cadastrar(req);
+    }
+
+    @PostMapping("/auth/login")
+    public LoginResponse entrar(
+            @Valid @RequestBody LoginRequest req,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
+        AuthService.LoginAutenticado resultado =
+            auth.entrar(req);
+
+        csrfRepository.saveToken(
+            null, request, response
+        );
+
+        cookies.criarCookie(
+            response,
+            resultado.token(),
+            resultado.expiracaoSegundos()
+        );
+
+        response.setHeader(
+            "Cache-Control", "no-store"
+        );
+
+        return new LoginResponse(
+            resultado.expiracaoSegundos(),
+            resultado.usuario()
+        );
+    }
+
+    @GetMapping("/auth/me")
+    public UsuarioDto eu(
+            Authentication authentication,
+            HttpServletResponse response) {
+
+        response.setHeader(
+            "Cache-Control", "no-store"
+        );
+
+        return UsuarioDto.de(
+            usuarios.atual(authentication)
+        );
+    }
+
+    @PostMapping("/auth/logout")
+    public MensagemResponse sair(
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
+        String token = extrairToken(request);
+
+        if (token == null) {
+            throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Sessão não encontrada."
+            );
+        }
+
+        revogacao.revogar(token);
+
+        csrfRepository.saveToken(
+            null, request, response
+        );
+
+        cookies.removerCookie(response);
+
+        response.setHeader(
+            "Cache-Control", "no-store"
+        );
+
+        return new MensagemResponse(
+            "Sessão encerrada neste navegador."
+        );
+    }
+
+    @GetMapping("/health")
+    public Map<String, String> saude() {
+        return Map.of("status", "ok");
+    }
+
+    private String extrairToken(
+            HttpServletRequest request) {
+
+        Cookie[] cookies = request.getCookies();
+
+        if (cookies == null) {
+            return null;
+        }
+
+        String encontrado = null;
+
+        for (Cookie cookie : cookies) {
+            if (AuthCookieService.NOME_COOKIE.equals(
+                    cookie.getName())) {
+
+                String valor = cookie.getValue();
+
+                if (valor == null || valor.isBlank()
+                        || encontrado != null) {
+                    return null;
+                }
+
+                encontrado = valor;
+            }
+        }
+
+        return encontrado;
+    }
+}

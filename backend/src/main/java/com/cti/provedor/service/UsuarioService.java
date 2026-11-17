@@ -1,47 +1,241 @@
-package com.cti.provedor.service;                        // pacote desta classe
-// ============================================================================
-// SIMPLES: As regras do administrador.
-// Lista usuários (com filtro por status) e muda o status (aprovar, bloquear).
-// Chamado por: AdminUsuarioController.
-// ============================================================================
+package com.cti.provedor.service;
 
-import com.cti.provedor.dto.UsuarioDto;                            // import: o formato de dados UsuarioDto
-import com.cti.provedor.model.StatusUsuario;                       // import: a entidade (tabela) StatusUsuario
-import com.cti.provedor.model.Usuario;                             // import: a entidade (tabela) Usuario
-import com.cti.provedor.repository.UsuarioRepository;              // import: o repositório (acesso ao banco) UsuarioRepository
-import com.cti.provedor.config.ApiException;                                    // import: nosso erro com código HTTP
-import java.util.List;                                                              // import: tipo lista
-import org.springframework.http.HttpStatus;                                         // import: códigos HTTP (400, 401, 404)
-import org.springframework.security.core.Authentication;                            // import: usuário logado
-import org.springframework.stereotype.Service;                                      // import: marca como serviço do Spring
+import com.cti.provedor.config.ApiException;
+import com.cti.provedor.dto.UsuarioDto;
+import com.cti.provedor.model.PerfilUsuario;
+import com.cti.provedor.model.StatusUsuario;
+import com.cti.provedor.model.Usuario;
+import com.cti.provedor.repository.UsuarioRepository;
 
-@Service                                                                            // serviço do Spring
-public class UsuarioService {                                                       // regras de usuário: quem sou eu, listar, aprovar/bloquear
-    private final UsuarioRepository repo;                                           // repositório de usuários
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
-    public UsuarioService(UsuarioRepository repo) {                                 // construtor: o Spring entrega o repositório
-        this.repo = repo;                                                           // guarda o repositório
-    }                                                                               // fecha o bloco
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-    /** Usuário logado a partir do token JWT já validado pelo filtro. */
-    public Usuario atual(Authentication authentication) {                           // descobre quem está logado a partir do token
-        return repo.findByEmailIgnoreCase(authentication.getName())                 // o e-mail do token vira busca no banco
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Sessão inválida. Entre novamente."));  // não achou: erro 401, entre de novo
-    }                                                                               // fecha o bloco
+@Service
+public class UsuarioService {
 
-    public List<UsuarioDto> listar(StatusUsuario status) {                          // lista usuários para a tela de liberação
-        List<Usuario> lista = status == null ? repo.findAllByOrderByCriadoEmDesc()  // sem filtro: todos, mais novos primeiro
-                : repo.findByStatusOrderByCriadoEmDesc(status);                     // com filtro: só os do status pedido
-        return lista.stream().map(UsuarioDto::de).toList();                         // converte cada Usuario em UsuarioDto (sem senha)
-    }                                                                               // fecha o bloco
+    private final UsuarioRepository repo;
+    private final PasswordEncoder encoder;
 
-    public UsuarioDto alterarStatus(Long id, StatusUsuario novoStatus, Usuario quemAltera) {  // aprova, bloqueia ou deixa pendente um usuário
-        Usuario alvo = repo.findById(id)                                            // busca o usuário alvo pelo id
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Usuário não encontrado."));  // não achou: erro 404
-        if (alvo.getId().equals(quemAltera.getId())) {                              // o admin está mexendo em si mesmo?
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Você não pode alterar o seu próprio acesso.");  // então recusa com erro 400
-        }                                                                           // fecha o bloco
-        alvo.setStatus(novoStatus);                                                 // troca o status
-        return UsuarioDto.de(repo.save(alvo));                                      // salva no banco e devolve o DTO
-    }                                                                               // fecha o bloco
-}                                                                                   // fecha o bloco
+    public UsuarioService(
+            UsuarioRepository repo,
+            PasswordEncoder encoder) {
+
+        this.repo = repo;
+        this.encoder = encoder;
+    }
+
+    @Transactional(readOnly = true)
+    public Usuario atual(Authentication authentication) {
+
+        if (authentication == null
+                || !authentication.isAuthenticated()) {
+            throw new ApiException(
+                HttpStatus.UNAUTHORIZED,
+                "Sessão inválida. Entre novamente."
+            );
+        }
+
+        Usuario usuario = repo
+            .findByEmailIgnoreCase(authentication.getName())
+            .orElseThrow(() -> new ApiException(
+                HttpStatus.UNAUTHORIZED,
+                "Sessão inválida. Entre novamente."
+            ));
+
+        if (usuario.getStatus() != StatusUsuario.APROVADO) {
+            throw new ApiException(
+                HttpStatus.UNAUTHORIZED,
+                "Sessão inválida. Entre novamente."
+            );
+        }
+
+        return usuario;
+    }
+
+    @Transactional(readOnly = true)
+    public List<UsuarioDto> listar(StatusUsuario status) {
+
+        List<Usuario> lista = status == null
+            ? repo.findAllByOrderByCriadoEmDesc()
+            : repo.findByStatusOrderByCriadoEmDesc(status);
+
+        return lista.stream()
+            .map(UsuarioDto::de)
+            .toList();
+    }
+
+    @Transactional
+    public UsuarioDto alterarStatus(
+            Long id,
+            StatusUsuario novoStatus,
+            Usuario quemAltera) {
+
+        validarAdministrador(quemAltera);
+
+        if (novoStatus == null) {
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "Informe um status válido."
+            );
+        }
+
+        Usuario alvo = buscar(id);
+
+        impedirPropriaConta(alvo, quemAltera);
+
+        if (alvo.getStatus() != novoStatus) {
+            alvo.setStatus(novoStatus);
+            incrementarVersaoSessao(alvo);
+        }
+
+        return UsuarioDto.de(repo.save(alvo));
+    }
+
+    @Transactional
+    public UsuarioDto promoverParaAdmin(
+            Long id,
+            Usuario administrador) {
+
+        validarAdministrador(administrador);
+
+        Usuario alvo = buscar(id);
+
+        impedirPropriaConta(alvo, administrador);
+
+        if (alvo.getPerfil() == PerfilUsuario.ADMIN) {
+            throw new ApiException(
+                HttpStatus.CONFLICT,
+                "Este usuário já possui o perfil ADMIN."
+            );
+        }
+
+        if (alvo.getPerfil() != PerfilUsuario.USER) {
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "O usuário não possui um perfil elegível."
+            );
+        }
+
+        if (alvo.getStatus() != StatusUsuario.APROVADO) {
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "Somente usuários aprovados podem ser promovidos."
+            );
+        }
+
+        alvo.setPerfil(PerfilUsuario.ADMIN);
+        incrementarVersaoSessao(alvo);
+
+        return UsuarioDto.de(repo.save(alvo));
+    }
+
+    @Transactional
+    public void redefinirSenha(
+            Long id,
+            String novaSenha,
+            Usuario administrador) {
+
+        validarAdministrador(administrador);
+
+        Usuario alvo = buscar(id);
+
+        impedirPropriaConta(alvo, administrador);
+
+        if (alvo.isAdmin()) {
+            throw new ApiException(
+                HttpStatus.FORBIDDEN,
+                "Não é permitido redefinir a senha de outro administrador."
+            );
+        }
+
+        if (novaSenha == null
+                || !novaSenha.matches(
+                    "(?s)^(?=.*[A-Za-z])(?=.*\\d).{8,72}$"
+                )) {
+
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "A senha deve ter de 8 a 72 caracteres, com letras e números."
+            );
+        }
+
+        if (novaSenha.getBytes(
+                StandardCharsets.UTF_8
+            ).length > 72) {
+
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "A senha é longa demais (limite do BCrypt: 72 bytes)."
+            );
+        }
+
+        if (encoder.matches(
+                novaSenha,
+                alvo.getSenhaHash()
+            )) {
+
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "A nova senha deve ser diferente da senha atual."
+            );
+        }
+
+        alvo.setSenhaHash(
+            encoder.encode(novaSenha)
+        );
+
+        incrementarVersaoSessao(alvo);
+        repo.save(alvo);
+    }
+
+    private Usuario buscar(Long id) {
+        return repo.findById(id)
+            .orElseThrow(() -> new ApiException(
+                HttpStatus.NOT_FOUND,
+                "Usuário não encontrado."
+            ));
+    }
+
+    private void validarAdministrador(
+            Usuario administrador) {
+
+        if (administrador == null
+                || !administrador.isAdmin()
+                || administrador.getStatus()
+                    != StatusUsuario.APROVADO) {
+
+            throw new ApiException(
+                HttpStatus.FORBIDDEN,
+                "Somente administradores aprovados podem executar esta operação."
+            );
+        }
+    }
+
+    private void impedirPropriaConta(
+            Usuario alvo,
+            Usuario administrador) {
+
+        if (alvo.getId().equals(administrador.getId())) {
+            throw new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "Você não pode alterar sua própria conta por esta rota."
+            );
+        }
+    }
+
+    private void incrementarVersaoSessao(
+            Usuario usuario) {
+
+        long atual = usuario.getVersaoSessao() == null
+            ? 0L
+            : usuario.getVersaoSessao();
+
+        usuario.setVersaoSessao(atual + 1L);
+    }
+}

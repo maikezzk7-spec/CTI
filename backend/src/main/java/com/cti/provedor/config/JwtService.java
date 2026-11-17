@@ -1,60 +1,213 @@
-package com.cti.provedor.config;                       // pacote desta classe
-// ============================================================================
-//  Fábrica de token.
-// Cria o token JWT no login e confere se um token é válido.
-// Quem usa: AuthService (criar) e JwtAuthenticationFilter (conferir).
-// ============================================================================
+package com.cti.provedor.config;
 
-import com.cti.provedor.config.AppProperties;                                   // import: configurações (segredo e validade do token)
-import com.cti.provedor.model.Usuario;                                        // import: a entidade Usuario
-import io.jsonwebtoken.Claims;                                                      // import: Claims = os dados guardados dentro do token
-import io.jsonwebtoken.JwtException;                                                // import: erro de token inválido
-import io.jsonwebtoken.Jwts;                                                        // import: Jwts = fábrica de tokens
-import io.jsonwebtoken.security.Keys;                                               // import: Keys = cria a chave de assinatura
-import java.nio.charset.StandardCharsets;                                           // import: UTF-8 para converter o segredo em bytes
-import java.time.Instant;                                                           // import: Instant = momento no tempo
-import java.util.Date;                                                              // import: Date = data (formato que a biblioteca pede)
-import java.util.Optional;                                                          // import: Optional = resultado que pode não existir
-import javax.crypto.SecretKey;                                                      // import: SecretKey = a chave secreta
-import org.springframework.stereotype.Service;                                      // import: marca como serviço do Spring
+import com.cti.provedor.model.Usuario;
 
-/** Gera e valida o token JWT (HS256). */
-@Service                                                                            // serviço do Spring
-public class JwtService {                                                           // cria e confere tokens JWT
-    private final SecretKey chave;                                                  // a chave que assina o token
-    private final long expiracaoSegundos;                                           // quanto tempo o token vale, em segundos
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 
-    public JwtService(AppProperties props) {                                        // construtor: lê o segredo do application.properties
-        byte[] segredo = props.jwt().secret().getBytes(StandardCharsets.UTF_8);     // transforma o segredo em bytes
-        if (segredo.length < 32) {                                                  // segredo curto demais é inseguro
-            throw new IllegalStateException("JWT_SECRET precisa ter pelo menos 32 caracteres.");  // então o servidor nem liga, e avisa o motivo
-        }                                                                           // fecha o bloco
-        this.chave = Keys.hmacShaKeyFor(segredo);                                   // cria a chave HMAC a partir do segredo
-        this.expiracaoSegundos = props.jwt().expirationMinutes() * 60;              // minutos viram segundos
-    }                                                                               // fecha o bloco
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
+import java.util.Optional;
+import java.util.UUID;
 
-    public String gerar(Usuario usuario) {                                          // gerar: cria o token do usuário logado
-        Instant agora = Instant.now();                                              // momento atual
-        return Jwts.builder()                                                       // começa a montar o token
-                .subject(usuario.getEmail())                                        // "subject" = e-mail do dono do token
-                .claim("perfil", usuario.getPerfil().name())                        // guarda o perfil (USER ou ADMIN) dentro do token
-                .issuedAt(Date.from(agora))                                         // quando foi criado
-                .expiration(Date.from(agora.plusSeconds(expiracaoSegundos)))        // quando expira
-                .signWith(chave)                                                    // assina com a chave secreta (ninguém consegue falsificar)
-                .compact();                                                         // gera o texto final do token
-    }                                                                               // fecha o bloco
+import javax.crypto.SecretKey;
 
-    /** E-mail (subject) do token, ou vazio se o token for inválido ou estiver expirado. */
-    public Optional<String> emailDoToken(String token) {                            // emailDoToken: confere o token e devolve o e-mail
-        try {                                                                       // tenta ler o token
-            Claims claims = Jwts.parser().verifyWith(chave).build().parseSignedClaims(token).getPayload();  // confere a assinatura e a validade; pega os dados
-            return Optional.ofNullable(claims.getSubject());                        // devolve o e-mail (subject)
-        } catch (JwtException | IllegalArgumentException e) {                       // token falso, adulterado ou vencido
-            return Optional.empty();                                                // devolve vazio
-        }                                                                           // fecha o bloco
-    }                                                                               // fecha o bloco
+import org.springframework.stereotype.Service;
 
-    public long getExpiracaoSegundos() {                                            // devolve a validade para o front
-        return expiracaoSegundos;                                                   // em segundos
-    }                                                                               // fecha o bloco
-}                                                                                   // fecha o bloco
+@Service
+public class JwtService {
+
+    private static final int TAMANHO_MAX_TOKEN = 4096;
+
+    private final SecretKey chave;
+    private final long expiracaoSegundos;
+
+    public record DadosToken(
+            String jti,
+            String email,
+            Instant expiraEm
+    ) {}
+
+    public JwtService(AppProperties props) {
+
+        String segredo = props.jwt().secret();
+
+        if (segredo == null || segredo.isBlank()) {
+            throw new IllegalStateException(
+                "JWT_SECRET não foi configurado."
+            );
+        }
+
+        byte[] bytes = segredo.getBytes(
+            StandardCharsets.UTF_8
+        );
+
+        if (bytes.length < 32) {
+            throw new IllegalStateException(
+                "JWT_SECRET precisa ter pelo menos 32 bytes."
+            );
+        }
+
+        this.chave = Keys.hmacShaKeyFor(bytes);
+
+        this.expiracaoSegundos = Math.multiplyExact(
+            props.jwt().expirationMinutes(),
+            60L
+        );
+
+        if (expiracaoSegundos <= 0) {
+            throw new IllegalStateException(
+                "A expiração JWT deve ser positiva."
+            );
+        }
+    }
+
+    public String gerar(Usuario usuario) {
+
+        if (usuario == null
+                || usuario.getEmail() == null
+                || usuario.getPerfil() == null
+                || usuario.getVersaoSessao() == null) {
+
+            throw new IllegalArgumentException(
+                "Dados do usuário inválidos."
+            );
+        }
+
+        Instant agora = Instant.now();
+
+        return Jwts.builder()
+            .id(UUID.randomUUID().toString())
+            .subject(usuario.getEmail())
+            .claim(
+                "perfil",
+                usuario.getPerfil().name()
+            )
+            .claim(
+                "versaoSessao",
+                usuario.getVersaoSessao()
+            )
+            .issuedAt(Date.from(agora))
+            .expiration(
+                Date.from(
+                    agora.plusSeconds(expiracaoSegundos)
+                )
+            )
+            .signWith(chave, Jwts.SIG.HS256)
+            .compact();
+    }
+
+    private Optional<Claims> claimsValidas(
+            String token) {
+
+        if (token == null
+                || token.isBlank()
+                || token.length() > TAMANHO_MAX_TOKEN) {
+
+            return Optional.empty();
+        }
+
+        try {
+            var jwt = Jwts.parser()
+                .verifyWith(chave)
+                .build()
+                .parseSignedClaims(token);
+
+            if (!"HS256".equals(
+                    jwt.getHeader().getAlgorithm())) {
+                return Optional.empty();
+            }
+
+            Claims claims = jwt.getPayload();
+
+            if (claims.getId() == null
+                    || !uuidValido(claims.getId())
+                    || claims.getSubject() == null
+                    || claims.getSubject().isBlank()
+                    || claims.getExpiration() == null
+                    || claims.getIssuedAt() == null
+                    || !(claims.get("versaoSessao")
+                            instanceof Number)) {
+
+                return Optional.empty();
+            }
+
+            if (claims.getIssuedAt()
+                    .after(new Date(
+                        System.currentTimeMillis() + 60000L
+                    ))) {
+                return Optional.empty();
+            }
+
+            return Optional.of(claims);
+
+        } catch (JwtException
+                | IllegalArgumentException e) {
+
+            return Optional.empty();
+        }
+    }
+
+    private boolean uuidValido(String valor) {
+
+        if (valor == null || valor.length() != 36) {
+            return false;
+        }
+
+        try {
+            return UUID.fromString(valor)
+                .toString()
+                .equals(valor);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public Optional<String> emailDoToken(
+            String token) {
+
+        return claimsValidas(token)
+            .map(Claims::getSubject);
+    }
+
+    public Optional<DadosToken> dadosDoToken(
+            String token) {
+
+        return claimsValidas(token)
+            .map(claims ->
+                new DadosToken(
+                    claims.getId(),
+                    claims.getSubject(),
+                    claims.getExpiration().toInstant()
+                )
+            );
+    }
+
+    public boolean versaoSessaoValida(
+            String token,
+            Long versaoAtual) {
+
+        if (versaoAtual == null) {
+            return false;
+        }
+
+        return claimsValidas(token)
+            .map(claims -> {
+                Number versao =
+                    (Number) claims.get(
+                        "versaoSessao"
+                    );
+
+                return versao.longValue()
+                    == versaoAtual.longValue();
+            })
+            .orElse(false);
+    }
+
+    public long getExpiracaoSegundos() {
+        return expiracaoSegundos;
+    }
+}

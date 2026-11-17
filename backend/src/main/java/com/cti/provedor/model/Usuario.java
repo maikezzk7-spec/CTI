@@ -1,63 +1,134 @@
-package com.cti.provedor.model;                          // pacote desta classe
-// ============================================================================
-// A tabela 'usuario' dentro do Java.
-// Cada campo daqui é uma coluna da tabela (nome, e-mail, senha criptografada, perfil, status).
-// Esta é a ÚNICA tabela que o Java grava.
-// ============================================================================
+package com.cti.provedor.model;
 
-import jakarta.persistence.*;                                                      // import: anotações JPA (@Entity, @Id, @Column...)
-import java.time.LocalDateTime;                                                    // import: tipo data e hora
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
-@Entity                                                                            // entidade: cada objeto Usuario é uma linha da tabela
-@Table(name = "usuario")                                                           // tabela usuario no PostgreSQL
-public class Usuario {                                                             // classe do usuário
-    @Id                                                                            // chave primária
-    @GeneratedValue(strategy = GenerationType.IDENTITY)                            // o banco gera o número sozinho (1, 2, 3...)
-    private Long id;                                                               // id do usuário
+/**
+ * Entidade que representa um usuário no PostgreSQL.
+ */
+@Entity
+@Table(name = "usuario")
+public class Usuario {
 
-    @Column(nullable = false, length = 120)                                        // coluna obrigatória, até 120 caracteres
-    private String nome;                                                           // nome
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Column(nullable = false, unique = true, length = 160)                         // coluna obrigatória, única, até 160 caracteres
-    private String email;                                                          // e-mail (usado no login)
+    @Column(nullable = false, length = 120)
+    private String nome;
 
-    @Column(name = "senha_hash", nullable = false, length = 100)                   // coluna senha_hash
-    private String senhaHash;                                                      // senha criptografada com BCrypt
+    @Column(nullable = false, unique = true, length = 160)
+    private String email;
 
-    @Column(length = 30)                                                           // coluna opcional
-    private String matricula;                                                      // matrícula do usuário
+    @Column(name = "senha_hash", nullable = false, length = 100)
+    private String senhaHash;
 
-    @Column(length = 60)                                                           // coluna opcional
-    private String turma;                                                          // turma do usuário
+    @Column(length = 30)
+    private String matricula;
 
-    @Enumerated(EnumType.STRING)                                                   // guarda o nome do enum como texto
-    @Column(nullable = false, length = 20)                                         // coluna obrigatória
-    private PerfilUsuario perfil = PerfilUsuario.USER;                             // perfil: começa como USER
+    @Column(length = 60)
+    private String turma;
 
-    @Enumerated(EnumType.STRING)                                                   // guarda o nome do enum como texto
-    @Column(nullable = false, length = 20)                                         // coluna obrigatória
-    private StatusUsuario status = StatusUsuario.PENDENTE;                         // status: começa PENDENTE
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private PerfilUsuario perfil = PerfilUsuario.USER;
 
-    @Column(name = "criado_em", nullable = false)                                  // coluna criado_em
-    private LocalDateTime criadoEm;                                                // quando a conta foi criada
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private StatusUsuario status = StatusUsuario.PENDENTE;
 
-    public Long getId() { return id; }                                             // getters e setters: ler e trocar cada campo
-    public String getNome() { return nome; }                                       // nome: ler
-    public void setNome(String nome) { this.nome = nome; }                         // nome: trocar
-    public String getEmail() { return email; }                                     // e-mail: ler
-    public void setEmail(String email) { this.email = email; }                     // e-mail: trocar
-    public String getSenhaHash() { return senhaHash; }                             // hash da senha: ler
-    public void setSenhaHash(String senhaHash) { this.senhaHash = senhaHash; }     // hash da senha: trocar
-    public String getMatricula() { return matricula; }                             // matrícula: ler
-    public void setMatricula(String matricula) { this.matricula = matricula; }     // matrícula: trocar
-    public String getTurma() { return turma; }                                     // turma: ler
-    public void setTurma(String turma) { this.turma = turma; }                     // turma: trocar
-    public PerfilUsuario getPerfil() { return perfil; }                            // perfil: ler
-    public void setPerfil(PerfilUsuario perfil) { this.perfil = perfil; }          // perfil: trocar
-    public StatusUsuario getStatus() { return status; }                            // status: ler
-    public void setStatus(StatusUsuario status) { this.status = status; }          // status: trocar
-    public LocalDateTime getCriadoEm() { return criadoEm; }                        // data de criação: ler
-    public void setCriadoEm(LocalDateTime criadoEm) { this.criadoEm = criadoEm; }  // data de criação: trocar
+    @Column(name = "criado_em", nullable = false)
+    private LocalDateTime criadoEm;
 
-    public boolean isAdmin() { return perfil == PerfilUsuario.ADMIN; }             // atalho: true se o perfil é ADMIN
-}                                                                                  // fecha o bloco
+    /**
+     * Versão da sessão JWT.
+     * Ao redefinir a senha, incrementamos este número.
+     * Tokens com versões antigas deixam de autenticar.
+     */
+    @Column(name = "versao_sessao", nullable = false)
+    private Long versaoSessao = 0L;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getNome() {
+        return nome;
+    }
+
+    public void setNome(String nome) {
+        this.nome = nome;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getSenhaHash() {
+        return senhaHash;
+    }
+
+    public void setSenhaHash(String senhaHash) {
+        this.senhaHash = senhaHash;
+    }
+
+    public String getMatricula() {
+        return matricula;
+    }
+
+    public void setMatricula(String matricula) {
+        this.matricula = matricula;
+    }
+
+    public String getTurma() {
+        return turma;
+    }
+
+    public void setTurma(String turma) {
+        this.turma = turma;
+    }
+
+    public PerfilUsuario getPerfil() {
+        return perfil;
+    }
+
+    public void setPerfil(PerfilUsuario perfil) {
+        this.perfil = perfil;
+    }
+
+    public StatusUsuario getStatus() {
+        return status;
+    }
+
+    public void setStatus(StatusUsuario status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getCriadoEm() {
+        return criadoEm;
+    }
+
+    public void setCriadoEm(LocalDateTime criadoEm) {
+        this.criadoEm = criadoEm;
+    }
+
+    public Long getVersaoSessao() {
+        return versaoSessao;
+    }
+
+    public void setVersaoSessao(Long versaoSessao) {
+        this.versaoSessao = versaoSessao;
+    }
+
+    public boolean isAdmin() {
+        return perfil == PerfilUsuario.ADMIN;
+    }
+}

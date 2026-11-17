@@ -1,40 +1,89 @@
-package com.cti.provedor.controller;                     // pacote desta classe
-// ============================================================================
-// Tela do administrador (porta de entrada HTTP).
-// GET lista os usuários e PATCH aprova ou bloqueia um deles.
-// Chama: UsuarioService. Só ADMIN acessa.
-// ============================================================================
+package com.cti.provedor.controller;
 
-import com.cti.provedor.dto.UsuarioDto;                            // import: o formato de dados UsuarioDto
-import com.cti.provedor.model.StatusUsuario;                       // import: a entidade (tabela) StatusUsuario
-import com.cti.provedor.config.SecurityConfig;                   // import: a segurança SecurityConfig
-import com.cti.provedor.service.UsuarioService;                    // import: o serviço UsuarioService
-import jakarta.validation.Valid;                                                    // import: @Valid manda validar o corpo da requisição
-import jakarta.validation.constraints.NotNull;                                      // import: valida que o campo não é nulo
-import java.util.List;                                                              // import: tipo lista
-import org.springframework.security.core.Authentication;                            // import: usuário logado
-import org.springframework.web.bind.annotation.*;                                   // import: anotações do Spring MVC (@GetMapping...)
+import com.cti.provedor.dto.UsuarioDto;
+import com.cti.provedor.model.StatusUsuario;
+import com.cti.provedor.service.UsuarioService;
 
-/** Telas de administração: liberar ou bloquear quem se cadastrou. Apenas ADMIN (veja SecurityConfig). */
-@RestController                                                                     // controller REST da liberação de acesso
-@RequestMapping("/api/admin/usuarios")                                              // rotas começam com /api/admin/usuarios (só ADMIN entra)
-public class AdminUsuarioController {                                               // classe do controller
-    public record AlterarStatusRequest(@NotNull(message = "Informe o status") StatusUsuario status) {}  // formato do JSON do PATCH: { "status": "APROVADO" }
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
-    private final UsuarioService service;                                           // serviço de usuários
+import java.util.List;
+import java.util.Map;
 
-    public AdminUsuarioController(UsuarioService service) {                         // construtor: o Spring entrega o serviço
-        this.service = service;                                                     // guarda o serviço
-    }                                                                               // fecha o bloco
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
-    @GetMapping                    // rota GET /api/admin/usuarios
-    public List<UsuarioDto> listar(@RequestParam(required = false) StatusUsuario status) {  // status é opcional (sem ele lista todos)
-        return service.listar(status);                                                // devolve a lista de usuários
-    }                                                                                 // fecha o bloco
+@RestController
+@RequestMapping("/api/admin/usuarios")
+@PreAuthorize("hasRole('ADMIN')")
+public class AdminUsuarioController {
 
-    @PatchMapping("/{id}/status")  // rota PATCH /api/admin/usuarios/{id}/status
-    public UsuarioDto alterarStatus(@PathVariable Long id, @Valid @RequestBody AlterarStatusRequest req,  // PATCH /api/admin/usuarios/{id}/status: aprova ou bloqueia
-                                    Authentication authentication) {                // {id} da URL, o JSON validado e quem está logado
-        return service.alterarStatus(id, req.status(), service.atual(authentication));  // muda o status; o admin não altera a si mesmo
-    }                                                                               // fecha o bloco
-}                                                                                   // fecha o bloco
+    private final UsuarioService service;
+
+    public AdminUsuarioController(
+            UsuarioService service) {
+        this.service = service;
+    }
+
+    public record AlterarStatusRequest(
+        @NotNull(message = "Informe o status")
+        StatusUsuario status
+    ) {}
+
+    public record RedefinirSenhaRequest(
+        @NotBlank(message = "Informe a nova senha")
+        String novaSenha
+    ) {}
+
+    @GetMapping
+    public List<UsuarioDto> listar(
+            @RequestParam(required = false)
+            StatusUsuario status) {
+
+        return service.listar(status);
+    }
+
+    @PatchMapping("/{id}/status")
+    public UsuarioDto alterarStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody AlterarStatusRequest req,
+            Authentication authentication) {
+
+        return service.alterarStatus(
+            id,
+            req.status(),
+            service.atual(authentication)
+        );
+    }
+
+    @PatchMapping("/{id}/senha")
+    public Map<String, String> redefinirSenha(
+            @PathVariable Long id,
+            @Valid @RequestBody RedefinirSenhaRequest req,
+            Authentication authentication) {
+
+        service.redefinirSenha(
+            id,
+            req.novaSenha(),
+            service.atual(authentication)
+        );
+
+        return Map.of(
+            "mensagem",
+            "Senha redefinida com sucesso. O usuário deverá entrar novamente."
+        );
+    }
+
+    @PatchMapping("/{id}/promover")
+    public UsuarioDto promoverParaAdmin(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return service.promoverParaAdmin(
+            id,
+            service.atual(authentication)
+        );
+    }
+}

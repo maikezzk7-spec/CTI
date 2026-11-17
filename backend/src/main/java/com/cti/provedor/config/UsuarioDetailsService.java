@@ -1,36 +1,69 @@
-package com.cti.provedor.config;                       // pacote desta classe
-// ============================================================================
-// Busca o usuário no banco para o Spring Security.
-// Só contas APROVADAS conseguem entrar.
-// Roda sozinho durante a autenticação.
-// ============================================================================
+package com.cti.provedor.config;
 
-import com.cti.provedor.model.StatusUsuario;                                  // import: os 3 estados da conta
-import com.cti.provedor.model.Usuario;                                        // import: a entidade Usuario
-import com.cti.provedor.repository.UsuarioRepository;                              // import: repositório para buscar no banco
-import org.springframework.security.core.userdetails.User;                          // import: User = usuário no formato do Spring Security
-import org.springframework.security.core.userdetails.UserDetails;                   // import: UserDetails = dados que o Security precisa
-import org.springframework.security.core.userdetails.UserDetailsService;            // import: interface que ensina o Security a buscar usuários
-import org.springframework.security.core.userdetails.UsernameNotFoundException;     // import: erro de "usuário não existe"
-import org.springframework.stereotype.Service;                                      // import: marca como serviço do Spring
+import com.cti.provedor.model.StatusUsuario;
+import com.cti.provedor.model.Usuario;
+import com.cti.provedor.repository.UsuarioRepository;
 
-/** Carrega o usuário do PostgreSQL. Só contas APROVADAS ficam "habilitadas". */
-@Service                                                                            // serviço do Spring
-public class UsuarioDetailsService implements UserDetailsService {                  // ensina o Spring Security a achar o usuário no PostgreSQL
-    private final UsuarioRepository repo;                                           // repositório de usuários
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
 
-    public UsuarioDetailsService(UsuarioRepository repo) {                          // construtor: o Spring entrega o repositório
-        this.repo = repo;                                                           // guarda o repositório
-    }                                                                               // fecha o bloco
+@Service
+public class UsuarioDetailsService
+        implements UserDetailsService {
 
-    @Override  // sobrescreve o método da interface
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {  // o Security chama isto com o e-mail digitado no login
-        Usuario u = repo.findByEmailIgnoreCase(email)                               // busca o usuário pelo e-mail
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));  // se não achar, lança erro de "não encontrado"
-        return User.withUsername(u.getEmail())                                      // monta o usuário do Security com o e-mail
-                .password(u.getSenhaHash())                                         // senha já criptografada (BCrypt) que está no banco
-                .authorities("ROLE_" + u.getPerfil().name())                        // papel do usuário: ROLE_USER ou ROLE_ADMIN
-                .disabled(u.getStatus() != StatusUsuario.APROVADO)                  // conta que não está APROVADA fica desabilitada (não entra)
-                .build();                                                           // constrói o objeto
-    }                                                                               // fecha o bloco
-}                                                                                   // fecha o bloco
+    private final UsuarioRepository repo;
+
+    public UsuarioDetailsService(
+            UsuarioRepository repo) {
+
+        this.repo = repo;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(
+            String email)
+            throws UsernameNotFoundException {
+
+        if (email == null || email.isBlank()) {
+            throw new UsernameNotFoundException(
+                "Usuário não encontrado."
+            );
+        }
+
+        Usuario usuario = repo
+            .findByEmailIgnoreCase(email.trim())
+            .orElseThrow(() ->
+                new UsernameNotFoundException(
+                    "Usuário não encontrado."
+                )
+            );
+
+        if (usuario.getPerfil() == null
+                || usuario.getStatus() == null
+                || usuario.getSenhaHash() == null
+                || usuario.getEmail() == null) {
+
+            throw new IllegalStateException(
+                "Cadastro de usuário inconsistente."
+            );
+        }
+
+        return User.withUsername(
+                usuario.getEmail()
+            )
+            .password(
+                usuario.getSenhaHash()
+            )
+            .authorities(
+                "ROLE_" + usuario.getPerfil().name()
+            )
+            .disabled(
+                usuario.getStatus()
+                    != StatusUsuario.APROVADO
+            )
+            .build();
+    }
+}

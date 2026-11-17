@@ -1,72 +1,185 @@
-package com.cti.provedor.controller;                     // pacote desta classe
-// ============================================================================
-// SIMPLES: O organizador de erros.
-// Pega qualquer erro e responde sempre no mesmo formato: {"erro": "mensagem"}.
-// Roda sozinho quando algo dá errado.
-// ============================================================================
+package com.cti.provedor.controller;
 
-import com.cti.provedor.config.ApiException;                    // import: o erro ApiException
-import java.util.LinkedHashMap;                                                     // import: mapa que mantém a ordem
-import java.util.Map;                                                               // import: tipo mapa
-import org.slf4j.Logger;                                                            // import: Logger = escreve no terminal
-import org.slf4j.LoggerFactory;                                                     // import: fábrica de Logger
-import org.springframework.http.HttpStatus;                                         // import: códigos HTTP
-import org.springframework.http.ResponseEntity;                                     // import: resposta HTTP com corpo
-import org.springframework.http.converter.HttpMessageNotReadableException;          // import: erro de JSON ilegível
-import org.springframework.web.HttpRequestMethodNotSupportedException;              // import: erro de método HTTP errado
-import org.springframework.web.bind.MethodArgumentNotValidException;                // import: erro de validação (@Valid)
-import org.springframework.web.bind.MissingServletRequestParameterException;        // import: erro de parâmetro faltando
-import org.springframework.web.bind.annotation.ExceptionHandler;                    // import: marca um método que trata um tipo de erro
-import org.springframework.web.bind.annotation.RestControllerAdvice;                // import: marca a classe que trata erros de todos os controllers
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;  // import: erro de tipo errado na URL
-import org.springframework.web.servlet.resource.NoResourceFoundException;           // import: erro de rota inexistente
+import com.cti.provedor.config.ApiException;
 
-/** Padroniza todas as respostas de erro: {"erro": "...", "campos": {...}}. */
-@RestControllerAdvice                                                               // captura qualquer erro e responde sempre no mesmo formato
-public class ErroHandler {                                               // classe tratadora de erros
-    private static final Logger log = LoggerFactory.getLogger(ErroHandler.class);  // logger para registrar erros inesperados
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-    public record ErroResposta(String erro, Map<String, String> campos) {}          // formato do erro: { "erro": "texto", "campos": {...} }
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-    private ResponseEntity<ErroResposta> resposta(HttpStatus status, String mensagem, Map<String, String> campos) {  // monta a resposta de erro com código HTTP
-        return ResponseEntity.status(status).body(new ErroResposta(mensagem, campos));  // devolve o código e o corpo
-    }                                                                               // fecha o bloco
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-    @ExceptionHandler(ApiException.class)                                           // trata os erros que nós mesmos lançamos
-    public ResponseEntity<ErroResposta> api(ApiException e) {                       // método que recebe o erro
-        return resposta(e.getStatus(), e.getMessage(), null);                       // usa o código e a mensagem que definimos
-    }                                                                               // fecha o bloco
+@RestControllerAdvice
+public class ErroHandler {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)                        // trata campos inválidos (@Valid)
-    public ResponseEntity<ErroResposta> validacao(MethodArgumentNotValidException e) {  // método que recebe o erro
-        Map<String, String> campos = new LinkedHashMap<>();                         // mapa campo -> mensagem
-        e.getBindingResult().getFieldErrors().forEach(fe -> campos.putIfAbsent(fe.getField(), fe.getDefaultMessage()));  // preenche o mapa com cada campo errado
-        return resposta(HttpStatus.BAD_REQUEST, "Verifique os campos informados.", campos);  // responde 400 com a lista de campos
-    }                                                                               // fecha o bloco
+    private static final Logger log =
+        LoggerFactory.getLogger(ErroHandler.class);
 
-    @ExceptionHandler(MissingServletRequestParameterException.class)                // trata parâmetro obrigatório faltando
-    public ResponseEntity<ErroResposta> parametroAusente(MissingServletRequestParameterException e) {  // método que recebe o erro
-        return resposta(HttpStatus.BAD_REQUEST, "Falta o parâmetro '" + e.getParameterName() + "'.", null);  // responde 400 dizendo qual parâmetro falta
-    }                                                                               // fecha o bloco
+    public record ErroResposta(
+        String erro,
+        Map<String, String> campos
+    ) {}
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})  // trata JSON ilegível ou tipo errado na URL
-    public ResponseEntity<ErroResposta> requisicaoInvalida(Exception e) {           // método que recebe o erro
-        return resposta(HttpStatus.BAD_REQUEST, "Requisição inválida.", null);      // responde 400
-    }                                                                               // fecha o bloco
+    private ResponseEntity<ErroResposta> resposta(
+            HttpStatus status,
+            String mensagem,
+            Map<String, String> campos) {
 
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)                 // trata método HTTP errado (ex.: GET em rota POST)
-    public ResponseEntity<ErroResposta> metodo(HttpRequestMethodNotSupportedException e) {  // método que recebe o erro
-        return resposta(HttpStatus.METHOD_NOT_ALLOWED, "Método não permitido.", null);  // responde 405
-    }                                                                               // fecha o bloco
+        return ResponseEntity
+            .status(status)
+            .header("Cache-Control", "no-store")
+            .body(
+                new ErroResposta(mensagem, campos)
+            );
+    }
 
-    @ExceptionHandler(NoResourceFoundException.class)                               // trata rota que não existe
-    public ResponseEntity<ErroResposta> naoEncontrado(NoResourceFoundException e) {  // método que recebe o erro
-        return resposta(HttpStatus.NOT_FOUND, "Recurso não encontrado.", null);     // responde 404
-    }                                                                               // fecha o bloco
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ErroResposta> api(
+            ApiException e) {
 
-    @ExceptionHandler(Exception.class)                                              // trata qualquer outro erro
-    public ResponseEntity<ErroResposta> inesperado(Exception e) {                   // método que recebe o erro
-        log.error("Erro inesperado", e);                                            // registra o erro no terminal para o professor ver
-        return resposta(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno. Tente novamente em instantes.", null);  // responde 500 sem expor detalhes
-    }                                                                               // fecha o bloco
-}                                                                                   // fecha o bloco
+        return resposta(
+            e.getStatus(),
+            e.getMessage(),
+            null
+        );
+    }
+
+    @ExceptionHandler(
+        ResponseStatusException.class
+    )
+    public ResponseEntity<ErroResposta> status(
+            ResponseStatusException e) {
+
+        HttpStatus status = HttpStatus.resolve(
+            e.getStatusCode().value()
+        );
+
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+
+        String mensagem = e.getReason();
+
+        if (mensagem == null || mensagem.isBlank()) {
+            mensagem = status.is5xxServerError()
+                ? "Erro interno. Tente novamente em instantes."
+                : "Não foi possível concluir a requisição.";
+        }
+
+        if (status.is5xxServerError()) {
+            log.error(
+                "Erro HTTP inesperado: {}",
+                status.value(),
+                e
+            );
+
+            mensagem =
+                "Erro interno. Tente novamente em instantes.";
+        }
+
+        return resposta(status, mensagem, null);
+    }
+
+    @ExceptionHandler(
+        MethodArgumentNotValidException.class
+    )
+    public ResponseEntity<ErroResposta> validacao(
+            MethodArgumentNotValidException e) {
+
+        Map<String, String> campos =
+            new LinkedHashMap<>();
+
+        e.getBindingResult()
+            .getFieldErrors()
+            .forEach(erro ->
+                campos.putIfAbsent(
+                    erro.getField(),
+                    erro.getDefaultMessage()
+                )
+            );
+
+        return resposta(
+            HttpStatus.BAD_REQUEST,
+            "Verifique os campos informados.",
+            campos
+        );
+    }
+
+    @ExceptionHandler(
+        MissingServletRequestParameterException.class
+    )
+    public ResponseEntity<ErroResposta> parametroAusente(
+            MissingServletRequestParameterException e) {
+
+        return resposta(
+            HttpStatus.BAD_REQUEST,
+            "Falta o parâmetro '" +
+                e.getParameterName() + "'.",
+            null
+        );
+    }
+
+    @ExceptionHandler({
+        HttpMessageNotReadableException.class,
+        MethodArgumentTypeMismatchException.class
+    })
+    public ResponseEntity<ErroResposta> requisicaoInvalida(
+            Exception e) {
+
+        return resposta(
+            HttpStatus.BAD_REQUEST,
+            "Requisição inválida.",
+            null
+        );
+    }
+
+    @ExceptionHandler(
+        HttpRequestMethodNotSupportedException.class
+    )
+    public ResponseEntity<ErroResposta> metodo(
+            HttpRequestMethodNotSupportedException e) {
+
+        return resposta(
+            HttpStatus.METHOD_NOT_ALLOWED,
+            "Método não permitido.",
+            null
+        );
+    }
+
+    @ExceptionHandler(
+        NoResourceFoundException.class
+    )
+    public ResponseEntity<ErroResposta> naoEncontrado(
+            NoResourceFoundException e) {
+
+        return resposta(
+            HttpStatus.NOT_FOUND,
+            "Recurso não encontrado.",
+            null
+        );
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErroResposta> inesperado(
+            Exception e) {
+
+        log.error("Erro inesperado", e);
+
+        return resposta(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Erro interno. Tente novamente em instantes.",
+            null
+        );
+    }
+}
