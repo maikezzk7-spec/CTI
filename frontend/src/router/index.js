@@ -4,17 +4,15 @@ import { useAuthStore } from '../stores/auth'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import CadastroView from '../views/CadastroView.vue'
+
 import AppLayout from '../layouts/AppLayout.vue'
+
 import UploadView from '../views/UploadView.vue'
 import RelatoriosView from '../views/RelatoriosView.vue'
 import GraficosView from '../views/GraficosView.vue'
 import PerfilView from '../views/PerfilView.vue'
-
-// Nova tela de Administração de Usuários
 import AdminUsuariosView from '../views/AdminUsuariosView.vue'
 
-// Guarda a posição de rolagem de cada tela.
-// Os dados ficam somente na memória da aplicação.
 const posicoesRolagem = new Map()
 
 const rotasDashboard = new Set([
@@ -75,9 +73,7 @@ const routes = [
         path: 'admin/usuarios',
         name: 'admin-usuarios',
         component: AdminUsuariosView,
-        meta: {
-          requiresAdmin: true
-        }
+        meta: { requiresAdmin: true }
       }
     ]
   }
@@ -85,15 +81,12 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(),
+
   routes,
 
   scrollBehavior(to, from, savedPosition) {
-    // Prioriza a posição salva pelo histórico do navegador.
-    if (savedPosition) {
-      return savedPosition
-    }
+    if (savedPosition) return savedPosition
 
-    // Guarda onde o usuário estava na tela anterior.
     if (ehRotaDashboard(from)) {
       posicoesRolagem.set(from.name, {
         left: window.scrollX,
@@ -101,7 +94,6 @@ const router = createRouter({
       })
     }
 
-    // Restaura a posição individual da tela de destino.
     if (ehRotaDashboard(to)) {
       return posicoesRolagem.get(to.name) || {
         left: 0,
@@ -109,42 +101,28 @@ const router = createRouter({
       }
     }
 
-    // Páginas públicas começam no topo.
-    return {
-      left: 0,
-      top: 0
-    }
+    return { left: 0, top: 0 }
   }
 })
 
-// Protege as rotas que exigem autenticação.
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
-  // Ao sair do dashboard, descarta as posições salvas
-  // se o usuário não estiver mais autenticado.
-  if (!auth.logado) {
-    posicoesRolagem.clear()
-  }
-
   const requerAutenticacao = to.matched.some(
-    (route) => route.meta.requiresAuth
+    rota => rota.meta.requiresAuth
   )
 
-  // Verifica se a rota exige perfil ADMIN.
   const requerAdministrador = to.matched.some(
-    (route) => route.meta.requiresAdmin
+    rota => rota.meta.requiresAdmin
   )
 
   if (!requerAutenticacao && !requerAdministrador) {
     return true
   }
 
-  if (!auth.logado) {
-    return { name: 'login' }
-  }
-
   try {
+    // Verifica a sessão no backend.
+    // Funciona inclusive após atualizar a página.
     const sessaoValida = await auth.verificarSessao()
 
     if (!sessaoValida) {
@@ -152,11 +130,7 @@ router.beforeEach(async (to) => {
       return { name: 'login' }
     }
 
-    // Impede que usuários comuns acessem a administração.
-    if (
-      requerAdministrador &&
-      auth.usuario?.perfil !== 'ADMIN'
-    ) {
+    if (requerAdministrador && !auth.isAdmin) {
       return { name: 'upload' }
     }
 

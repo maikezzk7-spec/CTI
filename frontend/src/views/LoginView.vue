@@ -45,10 +45,23 @@ async function entrar() {
 
     await router.push('/app/upload')
   } catch (e) {
-    erro.value =
+    const status = e.response?.status
+    const mensagemBackend =
+      e.response?.data?.erro ||
       e.response?.data?.message ||
-      e.response?.data?.mensagem ||
-      'Não foi possível entrar. Verifique suas credenciais ou a conexão com o servidor.'
+      e.response?.data?.mensagem
+
+    if (!e.response) {
+      erro.value = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
+    } else if (status === 401) {
+      erro.value = mensagemBackend || 'E-mail ou senha inválidos.'
+    } else if (status === 403 || status === 400) {
+      erro.value = mensagemBackend || 'Não foi possível acessar sua conta. Verifique os dados informados.'
+    } else if (status >= 500) {
+      erro.value = 'O servidor apresentou um problema. Tente novamente mais tarde.'
+    } else {
+      erro.value = 'Não foi possível entrar. Tente novamente.'
+    }
   } finally {
     carregando.value = false
   }

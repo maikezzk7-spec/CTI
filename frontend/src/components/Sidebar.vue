@@ -703,16 +703,21 @@ function fecharMenuMobile() {
   emit('fechar-menu')
 }
 
-// Encerra a sessão
-function sair() {
+// Encerra a sessão no backend antes de redirecionar
+async function sair() {
   cancelarLeituraFoto()
 
   perfilAberto.value = false
   personalizacaoAberta.value = false
   fecharMenuMobile()
 
-  auth.logout()
-  router.replace('/')
+  try {
+    await auth.logout()
+    await router.replace('/')
+  } catch (erro) {
+    console.error('Não foi possível encerrar a sessão:', erro)
+    alert('Não foi possível encerrar a sessão no servidor. Tente novamente.')
+  }
 }
 
 // Fecha os menus ao trocar de página

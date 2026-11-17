@@ -1,49 +1,18 @@
+
 import { defineStore } from 'pinia'
-import { api } from '../services/api'
-
-// Lê os dados locais sem interromper a aplicação
-// caso estejam ausentes ou corrompidos.
-function carregarUsuarioSalvo() {
-  try {
-    const usuarioSalvo = localStorage.getItem('usuario')
-
-    if (!usuarioSalvo) {
-      return null
-    }
-
-    const usuario = JSON.parse(usuarioSalvo)
-
-    if (
-      !usuario ||
-      typeof usuario !== 'object' ||
-      Array.isArray(usuario)
-    ) {
-      return null
-    }
-
-    return usuario
-  } catch (erro) {
-    console.warn(
-      'Não foi possível recuperar os dados do usuário:',
-      erro
-    )
-
-    return null
-  }
-}
+import { api, limparCsrf } from '../services/api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem('token'),
-    usuario: carregarUsuarioSalvo()
+    usuario: null,
+    sessaoVerificada: false
   }),
 
   getters: {
-    logado: (state) => !!state.token,
+    logado: (state) => !!state.usuario,
 
-    // Indica o perfil apresentado na interface.
-    // A autorização real deve ser feita pelo backend.
-    isAdmin: (state) => state.usuario?.perfil === 'ADMIN'
+    isAdmin: (state) =>
+      state.usuario?.perfil === 'ADMIN'
   },
 
   actions: {
@@ -53,49 +22,42 @@ export const useAuthStore = defineStore('auth', {
         senha
       })
 
-      this.token = data.token
       this.usuario = data.usuario
+      this.sessaoVerificada = true
 
-      localStorage.setItem('token', data.token)
-      localStorage.setItem(
-        'usuario',
-        JSON.stringify(data.usuario)
-      )
+      // Remove dados da autenticação antiga.
+      localStorage.removeItem('token')
+      localStorage.removeItem('usuario')
     },
 
     async verificarSessao() {
-      if (!this.token) {
-        return false
-      }
-
       try {
         const { data } = await api.get('/auth/me')
 
-        // Atualiza o perfil com os dados do servidor.
         this.usuario = data
-
-        localStorage.setItem(
-          'usuario',
-          JSON.stringify(data)
-        )
+        this.sessaoVerificada = true
 
         return true
       } catch (erro) {
-        // Token rejeitado pelo servidor.
         if (erro.response?.status === 401) {
-          this.logout()
+          this.usuario = null
+          this.sessaoVerificada = true
           return false
         }
 
-        // Erros temporários não invalidam automaticamente
-        // uma sessão.
         throw erro
       }
     },
 
-    logout() {
-      this.token = null
+    async logout() {
+      // Se a API falhar, não afirmamos que o cookie
+      // foi removido pelo servidor.
+      await api.post('/auth/logout')
+
       this.usuario = null
+      this.sessaoVerificada = true
+
+      limparCsrf()
 
       localStorage.removeItem('token')
       localStorage.removeItem('usuario')

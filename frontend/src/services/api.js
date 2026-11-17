@@ -1,19 +1,53 @@
 import axios from 'axios'
 
-// Cria uma instância do Axios para comunicação com o backend
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || '/api',
+
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+
+  withCredentials: true,
+
+  timeout: 30000
 })
 
-// Adiciona o token JWT às requisições, quando existir
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
+// Busca um token CSRF atualizado no backend.
+// Não armazena o JWT no JavaScript.
+let csrfPendente = null
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+export async function prepararCsrf() {
+  if (!csrfPendente) {
+    csrfPendente = api
+      .get('/auth/csrf')
+      .then(({ data }) => data.token)
+      .finally(() => {
+        csrfPendente = null
+      })
+  }
+
+  return csrfPendente
+}
+
+export function limparCsrf() {
+  csrfPendente = null
+}
+
+// Requisições que modificam dados exigem CSRF.
+api.interceptors.request.use(async (config) => {
+  const metodo = (config.method || 'get').toLowerCase()
+
+  const precisaCsrf = [
+    'post',
+    'put',
+    'patch',
+    'delete'
+  ].includes(metodo)
+
+  if (precisaCsrf) {
+    const token = await prepararCsrf()
+
+    config.headers.set('X-XSRF-TOKEN', token)
   }
 
   return config
