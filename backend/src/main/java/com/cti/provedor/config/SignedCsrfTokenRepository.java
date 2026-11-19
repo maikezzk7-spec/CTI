@@ -201,28 +201,21 @@ public class SignedCsrfTokenRepository
         );
     }
 
+    // O CSRF utiliza um vínculo aleatório próprio,
+    // independente do JWT de autenticação.
     private String obterVinculo(
             HttpServletRequest request) {
 
-        String jwt = cookie(
-            request,
-            AuthCookieService.NOME_COOKIE
-        );
-
-        if (jwt != null && !jwt.isBlank()) {
-            return "AUTH:" + jwt;
-        }
-
-        String anonimo = cookie(
+        String vinculo = cookie(
             request,
             BIND_COOKIE
         );
 
-        if (anonimo != null && !anonimo.isBlank()) {
-            return "ANON:" + anonimo;
+        if (vinculo == null || vinculo.isBlank()) {
+            return null;
         }
 
-        return null;
+        return "ANON:" + vinculo;
     }
 
     private String gerarAleatorio() {

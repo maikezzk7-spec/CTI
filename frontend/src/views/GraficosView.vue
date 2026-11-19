@@ -1,6 +1,6 @@
 
 <template>
-  <div class="min-h-screen bg-cti-bg p-4 text-cti-text sm:p-6 lg:p-8">
+  <div class="w-full min-w-0 text-cti-text">
     <!-- Cabeçalho -->
     <header class="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -31,7 +31,7 @@
     <!-- Estado vazio -->
     <section
       v-if="!store.temDados"
-      class="rounded-2xl border border-dashed border-cti-border bg-cti-sidebar px-5 py-12 text-center sm:px-8"
+      class="w-full rounded-2xl border border-dashed border-cti-border bg-cti-sidebar px-5 py-12 text-center sm:px-8 sm:py-14"
     >
       <div
         class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-cti-card text-cti-cyan"
@@ -52,7 +52,7 @@
         to="/app/upload"
         class="mt-6 inline-flex items-center gap-2 rounded-xl bg-cti-cyan px-5 py-3 text-sm font-semibold text-slate-950 transition-colors duration-200 hover:bg-cti-turquoise focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cti-cyan"
       >
-        <i class="fa-solid fa-upload" aria-hidden="true"></i>
+        <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
         Ir para Upload
       </router-link>
     </section>
@@ -60,7 +60,7 @@
     <template v-else>
       <!-- Indicadores -->
       <section
-        class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        class="mb-8 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
         aria-label="Resumo dos indicadores"
       >
         <article
@@ -171,7 +171,7 @@
           </p>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div class="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
           <!-- Clientes por segmento -->
           <article class="min-w-0 rounded-2xl border border-cti-border bg-cti-card p-5 sm:p-6">
             <div class="mb-5">
@@ -248,7 +248,7 @@
           </p>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div class="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
           <!-- Válidos e inválidos -->
           <article class="min-w-0 rounded-2xl border border-cti-border bg-cti-card p-5 sm:p-6">
             <div class="mb-5">

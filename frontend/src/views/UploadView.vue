@@ -21,7 +21,7 @@
 
     <!-- Área de upload -->
     <section
-      class="rounded-2xl border border-cti-border bg-cti-card p-5 shadow-lg shadow-black/10 sm:p-7"
+      class="rounded-2xl border border-cti-border bg-cti-sidebar p-5 shadow-lg shadow-black/10 sm:p-7"
     >
       <div class="mb-5 flex items-center gap-3">
         <div
@@ -196,7 +196,7 @@
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-sm text-cti-muted">
-                Clientes nível A
+                Clientes
               </p>
 
               <strong
@@ -369,7 +369,7 @@
 
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <article
-          v-for="(cliente, index) in uploadStore.dadosInvalidados"
+          v-for="(cliente, index) in clientesInvalidosPaginados"
           :key="index"
           class="rounded-xl border border-cti-border bg-cti-panel p-4"
         >
@@ -443,6 +443,13 @@
           </div>
         </article>
       </div>
+
+      <PaginacaoTabela
+        v-model:paginaAtual="paginaInvalidos"
+        v-model:tamanhoPagina="tamanhoInvalidos"
+        :total-itens="uploadStore.dadosInvalidados.length"
+        class="mt-5"
+      />
     </section>
 
     <!-- Prévia dos dados -->
@@ -472,15 +479,16 @@
                 v-for="coluna in colunas"
                 :key="coluna"
                 class="whitespace-nowrap border-b border-cti-border px-4 py-3 font-semibold"
+                :class="classeAlinhamentoColuna(coluna)"
               >
-                {{ coluna }}
+                {{ formatarNomeColuna(coluna) }}
               </th>
             </tr>
           </thead>
 
           <tbody>
             <tr
-              v-for="(linha, index) in uploadStore.dadosTratados"
+              v-for="(linha, index) in dadosPreviaPaginados"
               :key="index"
               class="border-b border-cti-border/70 transition hover:bg-cti-cyan/5"
             >
@@ -488,25 +496,71 @@
                 v-for="coluna in colunas"
                 :key="coluna"
                 class="whitespace-nowrap px-4 py-3 text-cti-text"
+                :class="classeAlinhamentoColuna(coluna)"
               >
-                {{ linha[coluna] }}
+                {{ formatarValorColuna(coluna, linha[coluna]) }}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <PaginacaoTabela
+        v-model:paginaAtual="paginaPrevia"
+        v-model:tamanhoPagina="tamanhoPrevia"
+        :total-itens="uploadStore.dadosTratados.length"
+        class="mt-5"
+      />
     </section>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useUploadStore } from "../stores/uploadStore";
+import PaginacaoTabela from "../components/PaginacaoTabela.vue";
 
 const uploadStore = useUploadStore();
 
 const arrastando = ref(false);
 const nomeArquivo = ref("");
+
+// Paginação da prévia dos dados.
+const paginaPrevia = ref(1);
+const tamanhoPrevia = ref(50);
+
+// Paginação dos clientes inválidos.
+const paginaInvalidos = ref(1);
+const tamanhoInvalidos = ref(50);
+
+// Exibe somente os registros da página selecionada.
+const dadosPreviaPaginados = computed(() => {
+  const inicio = (paginaPrevia.value - 1) * tamanhoPrevia.value;
+
+  return uploadStore.dadosTratados.slice(
+    inicio,
+    inicio + tamanhoPrevia.value
+  );
+});
+
+const clientesInvalidosPaginados = computed(() => {
+  const inicio =
+    (paginaInvalidos.value - 1) * tamanhoInvalidos.value;
+
+  return uploadStore.dadosInvalidados.slice(
+    inicio,
+    inicio + tamanhoInvalidos.value
+  );
+});
+
+// Retorna à primeira página quando uma nova planilha é processada.
+watch(
+  () => uploadStore.dadosTratados,
+  () => {
+    paginaPrevia.value = 1;
+    paginaInvalidos.value = 1;
+  }
+);
 
 function formatoPermitido(arquivo) {
   const extensao = arquivo.name
@@ -577,6 +631,76 @@ function aoSoltarArquivo(event) {
 
 async function processarPlanilha() {
   await uploadStore.processarPlanilha();
+}
+
+// Formata apenas o título exibido, sem alterar a chave original dos dados.
+function formatarNomeColuna(coluna) {
+  const nomesEspeciais = {
+    codigo: "Código",
+    nivel: "Nível",
+    contratacao: "Contratação"
+  };
+
+  return String(coluna)
+    .replace(/_/g, " ")
+    .trim()
+    .split(/\s+/)
+    .map((palavra) => {
+      const minuscula = palavra.toLowerCase();
+      return (
+        nomesEspeciais[minuscula] ||
+        minuscula.charAt(0).toUpperCase() + minuscula.slice(1)
+      );
+    })
+    .join(" ");
+}
+
+
+// Alinha títulos e valores das colunas de classificação e números.
+function classeAlinhamentoColuna(coluna) {
+  return [
+    "nivel_cliente",
+    "faturamento_anual",
+    "data_contratacao",
+    "uf"
+  ].includes(String(coluna).toLowerCase())
+    ? "text-center"
+    : "text-left";
+}
+
+// Formatação apenas visual: não altera os dados utilizados na validação.
+const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
+function formatarValorColuna(coluna, valor) {
+  if (String(coluna).toLowerCase() !== "faturamento_anual") {
+    return valor;
+  }
+
+  if (valor === null || valor === undefined || String(valor).trim() === "") {
+    return valor;
+  }
+
+  // Aceita números e textos numéricos comuns, sem modificar o valor original.
+  let numero;
+  if (typeof valor === "number") {
+    numero = valor;
+  } else {
+    const texto = String(valor).trim();
+    if (/^-?\d+(?:[.,]\d+)?$/.test(texto)) {
+      numero = Number(texto.replace(",", "."));
+    } else if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(texto)) {
+      numero = Number(texto.replace(/\./g, "").replace(",", "."));
+    } else {
+      return valor;
+    }
+  }
+
+  return Number.isFinite(numero) ? formatadorMoeda.format(numero) : valor;
 }
 
 const colunas = computed(() => {

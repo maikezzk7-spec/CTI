@@ -429,14 +429,24 @@ const menus = [
     icone: 'fa-solid fa-cloud-arrow-up'
   },
   {
-    nome: 'Relatórios',
-    rota: '/app/relatorios',
-    icone: 'fa-solid fa-file-lines'
+    nome: 'Dashboard',
+    rota: '/app/dashboard',
+    icone: 'fa-solid fa-chart-line'
+  },
+  {
+    nome: 'Clientes',
+    rota: '/app/clientes',
+    icone: 'fa-solid fa-users'
   },
   {
     nome: 'Gráficos',
     rota: '/app/graficos',
     icone: 'fa-solid fa-chart-column'
+  },
+  {
+    nome: 'Relatórios',
+    rota: '/app/relatorios',
+    icone: 'fa-solid fa-file-lines'
   }
 ]
 

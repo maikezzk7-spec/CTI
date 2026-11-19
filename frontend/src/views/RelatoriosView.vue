@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-cti-bg p-4 text-cti-text sm:p-6 lg:p-8">
+  <div class="space-y-6 text-cti-text">
     <!-- Cabeçalho da página -->
     <header class="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -52,7 +52,7 @@
         to="/app/upload"
         class="mt-6 inline-flex items-center gap-2 rounded-xl bg-cti-cyan px-5 py-3 text-sm font-semibold text-slate-950 transition-colors duration-200 hover:bg-cti-turquoise focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cti-cyan"
       >
-        <i class="fa-solid fa-upload" aria-hidden="true"></i>
+        <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
         Ir para Upload
       </router-link>
     </section>
@@ -296,7 +296,7 @@
 
             <tbody class="divide-y divide-cti-border">
               <tr
-                v-for="(erro, indice) in store.detalhesErros"
+                v-for="(erro, indice) in errosPaginados"
                 :key="`${erro.linha}-${erro.campo}-${indice}`"
                 class="transition-colors hover:bg-cti-card/70"
               >
@@ -321,6 +321,14 @@
             </tbody>
           </table>
         </div>
+
+        <PaginacaoTabela
+          v-if="store.detalhesErros.length > 0"
+          v-model:paginaAtual="paginaErros"
+          v-model:tamanhoPagina="tamanhoErros"
+          :total-itens="store.detalhesErros.length"
+          class="mt-5"
+        />
       </section>
 
       <!-- Clientes invalidados -->
@@ -355,7 +363,7 @@
 
             <tbody class="divide-y divide-cti-border">
               <tr
-                v-for="(cliente, indice) in store.dadosInvalidados"
+                v-for="(cliente, indice) in clientesInvalidosPaginados"
                 :key="`${cliente.codigo_cliente}-${indice}`"
                 class="transition-colors hover:bg-cti-card/70"
               >
@@ -393,13 +401,47 @@
             </tbody>
           </table>
         </div>
+
+        <PaginacaoTabela
+          v-if="store.dadosInvalidados.length > 0"
+          v-model:paginaAtual="paginaInvalidos"
+          v-model:tamanhoPagina="tamanhoInvalidos"
+          :total-itens="store.dadosInvalidados.length"
+          class="mt-5"
+        />
       </section>
     </template>
   </div>
 </template>
 
 <script setup>
+import { computed, ref, watch } from "vue";
 import { useUploadStore } from "../stores/uploadStore";
+import PaginacaoTabela from "../components/PaginacaoTabela.vue";
 
 const store = useUploadStore();
+
+const paginaErros = ref(1);
+const tamanhoErros = ref(50);
+const paginaInvalidos = ref(1);
+const tamanhoInvalidos = ref(50);
+
+const errosPaginados = computed(() => {
+  const inicio = (paginaErros.value - 1) * tamanhoErros.value;
+  return store.detalhesErros.slice(inicio, inicio + tamanhoErros.value);
+});
+
+const clientesInvalidosPaginados = computed(() => {
+  const inicio = (paginaInvalidos.value - 1) * tamanhoInvalidos.value;
+  return store.dadosInvalidados.slice(inicio, inicio + tamanhoInvalidos.value);
+});
+
+// Reinicia a paginação quando o processamento substitui os resultados.
+watch(
+  () => [store.detalhesErros, store.dadosInvalidados],
+  () => {
+    paginaErros.value = 1;
+    paginaInvalidos.value = 1;
+  }
+);
 </script>

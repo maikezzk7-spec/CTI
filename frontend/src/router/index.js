@@ -7,6 +7,8 @@ import CadastroView from '../views/CadastroView.vue'
 
 import AppLayout from '../layouts/AppLayout.vue'
 
+import DashboardView from '../views/DashboardView.vue'
+import ClientesView from '../views/ClientesView.vue'
 import UploadView from '../views/UploadView.vue'
 import RelatoriosView from '../views/RelatoriosView.vue'
 import GraficosView from '../views/GraficosView.vue'
@@ -16,6 +18,8 @@ import AdminUsuariosView from '../views/AdminUsuariosView.vue'
 const posicoesRolagem = new Map()
 
 const rotasDashboard = new Set([
+  'dashboard',
+  'clientes',
   'upload',
   'relatorios',
   'graficos',
@@ -49,6 +53,16 @@ const routes = [
     meta: { requiresAuth: true },
     redirect: '/app/upload',
     children: [
+      {
+        path: 'dashboard',
+        name: 'dashboard',
+        component: DashboardView
+      },
+      {
+        path: 'clientes',
+        name: 'clientes',
+        component: ClientesView
+      },
       {
         path: 'upload',
         name: 'upload',
